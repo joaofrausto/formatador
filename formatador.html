@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Formatador de Dados</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 24px;
+    margin-bottom: 6px;
+    color: #f1f5f9;
+  }
+  .subtitle {
+    color: #94a3b8;
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .panel-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #cbd5e1;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .stats {
+    font-size: 12px;
+    color: #64748b;
+  }
+  textarea {
+    width: 100%;
+    min-height: 380px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 12px;
+    color: #e2e8f0;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 13px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+  textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+  }
+  .buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 16px 0;
+  }
+  .btn {
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 1px solid #475569;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+    text-align: left;
+  }
+  .btn:hover {
+    background: #334155;
+    border-color: #3b82f6;
+  }
+  .btn:active {
+    transform: scale(0.98);
+  }
+  .btn-primary {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: white;
+  }
+  .btn-primary:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+  }
+  .btn-icon {
+    margin-right: 6px;
+    font-family: monospace;
+    color: #94a3b8;
+  }
+  .btn:hover .btn-icon {
+    color: #f1f5f9;
+  }
+  .btn-clear {
+    background: transparent;
+    border: 1px solid #475569;
+    color: #94a3b8;
+  }
+  .btn-clear:hover {
+    background: #7f1d1d;
+    border-color: #dc2626;
+    color: white;
+  }
+  .copy-btn {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover {
+    background: #059669;
+  }
+  .copy-btn.copied {
+    background: #6366f1;
+  }
+  .actions-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+  }
+  .options {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .options-title {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .checkbox-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .checkbox-row label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #cbd5e1;
+    cursor: pointer;
+  }
+  .checkbox-row input[type="checkbox"] {
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>Formatador de Dados</h1>
+    <p class="subtitle">Cole seus dados (um por linha) e escolha como formatar.</p>
+
+    <div class="options">
+      <div class="options-title">Opções de pré-processamento</div>
+      <div class="checkbox-row">
+        <label><input type="checkbox" id="trimItems" checked> Remover espaços de cada item</label>
+        <label><input type="checkbox" id="removeEmpty" checked> Ignorar linhas vazias</label>
+        <label><input type="checkbox" id="removeDupes"> Remover duplicados</label>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Entrada</span>
+          <span class="stats" id="inputStats">0 linhas</span>
+        </div>
+        <textarea id="input" placeholder="Cole aqui seus dados, um por linha:&#10;&#10;exemplo1&#10;exemplo2&#10;exemplo3"></textarea>
+        <div class="actions-row">
+          <button class="btn btn-clear" onclick="clearInput()">Limpar entrada</button>
+          <button class="btn btn-clear" onclick="pasteFromClipboard()">Colar da área de transferência</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Resultado</span>
+          <span class="stats" id="outputStats">0 caracteres</span>
+        </div>
+        <textarea id="output" placeholder="O resultado formatado aparecerá aqui..." readonly></textarea>
+        <div class="actions-row">
+          <button class="btn btn-clear" onclick="clearOutput()">Limpar resultado</button>
+          <button class="copy-btn" id="copyBtn" onclick="copyOutput()">Copiar tudo</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="btn btn-primary" onclick="format('comma')">
+        <span class="btn-icon">a,b,c</span> Juntar por vírgula (sem espaço)
+      </button>
+      <button class="btn btn-primary" onclick="format('commaQuotes')">
+        <span class="btn-icon">'a','b','c'</span> Juntar por vírgula com aspas simples
+      </button>
+      <button class="btn" onclick="format('commaDoubleQuotes')">
+        <span class="btn-icon">"a","b","c"</span> Juntar por vírgula com aspas duplas
+      </button>
+      <button class="btn" onclick="format('commaSpace')">
+        <span class="btn-icon">a, b, c</span> Juntar por vírgula e espaço
+      </button>
+      <button class="btn" onclick="format('commaSpaceQuotes')">
+        <span class="btn-icon">'a', 'b', 'c'</span> Vírgula + espaço + aspas simples
+      </button>
+      <button class="btn" onclick="format('inClause')">
+        <span class="btn-icon">IN (...)</span> SQL IN com aspas simples
+      </button>
+      <button class="btn" onclick="format('pipe')">
+        <span class="btn-icon">a|b|c</span> Juntar por pipe ( | )
+      </button>
+      <button class="btn" onclick="format('semicolon')">
+        <span class="btn-icon">a;b;c</span> Juntar por ponto e vírgula
+      </button>
+      <button class="btn" onclick="format('newline')">
+        <span class="btn-icon">↵</span> Uma por linha (limpar)
+      </button>
+      <button class="btn" onclick="format('uppercase')">
+        <span class="btn-icon">AB</span> MAIÚSCULAS
+      </button>
+      <button class="btn" onclick="format('lowercase')">
+        <span class="btn-icon">ab</span> minúsculas
+      </button>
+      <button class="btn" onclick="format('count')">
+        <span class="btn-icon">#</span> Contar itens únicos
+      </button>
+    </div>
+  </div>
+
+<script>
+  const inputEl = document.getElementById('input');
+  const outputEl = document.getElementById('output');
+  const inputStats = document.getElementById('inputStats');
+  const outputStats = document.getElementById('outputStats');
+  const copyBtn = document.getElementById('copyBtn');
+
+  function getItems() {
+    const trim = document.getElementById('trimItems').checked;
+    const removeEmpty = document.getElementById('removeEmpty').checked;
+    const removeDupes = document.getElementById('removeDupes').checked;
+
+    let items = inputEl.value.split(/\r?\n/);
+    if (trim) items = items.map(i => i.trim());
+    if (removeEmpty) items = items.filter(i => i.length > 0);
+    if (removeDupes) items = [...new Set(items)];
+    return items;
+  }
+
+  function format(type) {
+    const items = getItems();
+    let result = '';
+
+    switch(type) {
+      case 'comma':
+        result = items.join(',');
+        break;
+      case 'commaQuotes':
+        result = items.map(i => `'${i}'`).join(',');
+        break;
+      case 'commaDoubleQuotes':
+        result = items.map(i => `"${i}"`).join(',');
+        break;
+      case 'commaSpace':
+        result = items.join(', ');
+        break;
+      case 'commaSpaceQuotes':
+        result = items.map(i => `'${i}'`).join(', ');
+        break;
+      case 'inClause':
+        result = '(' + items.map(i => `'${i}'`).join(', ') + ')';
+        break;
+      case 'pipe':
+        result = items.join('|');
+        break;
+      case 'semicolon':
+        result = items.join(';');
+        break;
+      case 'newline':
+        result = items.join('\n');
+        break;
+      case 'uppercase':
+        result = items.map(i => i.toUpperCase()).join('\n');
+        break;
+      case 'lowercase':
+        result = items.map(i => i.toLowerCase()).join('\n');
+        break;
+      case 'count':
+        const unique = [...new Set(items)];
+        result = `Total de itens: ${items.length}\nItens únicos: ${unique.length}\nDuplicados: ${items.length - unique.length}`;
+        break;
+    }
+
+    outputEl.value = result;
+    updateOutputStats();
+  }
+
+  function copyOutput() {
+    if (!outputEl.value) return;
+    navigator.clipboard.writeText(outputEl.value).then(() => {
+      copyBtn.textContent = 'Copiado!';
+      copyBtn.classList.add('copied');
+      setTimeout(() => {
+        copyBtn.textContent = 'Copiar tudo';
+        copyBtn.classList.remove('copied');
+      }, 1500);
+    }).catch(() => {
+      outputEl.select();
+      document.execCommand('copy');
+      copyBtn.textContent = 'Copiado!';
+      copyBtn.classList.add('copied');
+      setTimeout(() => {
+        copyBtn.textContent = 'Copiar tudo';
+        copyBtn.classList.remove('copied');
+      }, 1500);
+    });
+  }
+
+  function clearInput() {
+    inputEl.value = '';
+    updateInputStats();
+    inputEl.focus();
+  }
+
+  function clearOutput() {
+    outputEl.value = '';
+    updateOutputStats();
+  }
+
+  async function pasteFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      inputEl.value = text;
+      updateInputStats();
+    } catch(e) {
+      inputEl.focus();
+      alert('Use Ctrl+V para colar.');
+    }
+  }
+
+  function updateInputStats() {
+    const lines = inputEl.value ? inputEl.value.split(/\r?\n/).filter(l => l.trim()).length : 0;
+    const chars = inputEl.value.length;
+    inputStats.textContent = `${lines.toLocaleString('pt-BR')} linhas • ${chars.toLocaleString('pt-BR')} caracteres`;
+  }
+
+  function updateOutputStats() {
+    const chars = outputEl.value.length;
+    outputStats.textContent = `${chars.toLocaleString('pt-BR')} caracteres`;
+  }
+
+  inputEl.addEventListener('input', updateInputStats);
+  updateInputStats();
+  updateOutputStats();
+
+  // Atalhos de teclado
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      format('comma');
+    }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'C') {
+      e.preventDefault();
+      copyOutput();
+    }
+  });
+</script>
+</body>
+</html>
