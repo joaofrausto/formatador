@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Formatador de Ofertas</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --accent:#f97316; --accent2:#22c55e;
+    --text:#e2e8f0; --muted:#94a3b8; --border:#334155;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:linear-gradient(160deg,#0f172a,#1e293b); color:var(--text);
+    min-height:100vh; padding:32px 16px;
+  }
+  .wrap{max-width:980px; margin:0 auto;}
+  h1{font-size:22px; margin:0 0 4px;}
+  p.sub{color:var(--muted); margin:0 0 24px; font-size:14px;}
+  .grid{display:grid; grid-template-columns:1fr; gap:20px;}
+  @media(min-width:900px){ .grid{grid-template-columns:1fr 1fr;} }
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:18px; display:flex; flex-direction:column;
+  }
+  .card h2{font-size:14px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:0 0 10px;}
+  textarea{
+    width:100%; min-height:280px; resize:vertical; background:#0b1220; color:var(--text);
+    border:1px solid var(--border); border-radius:8px; padding:12px; font-family:ui-monospace,Menlo,monospace;
+    font-size:13px; line-height:1.5;
+  }
+  .controls{display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;}
+  button{
+    background:var(--accent); color:#0f172a; border:none; padding:10px 16px;
+    border-radius:8px; font-weight:600; cursor:pointer; font-size:13px;
+  }
+  button.secondary{background:#334155; color:var(--text);}
+  button:hover{filter:brightness(1.08);}
+  .output-list{display:flex; flex-direction:column; gap:8px; overflow-y:auto; max-height:420px;}
+  .item{
+    background:#0b1220; border:1px solid var(--border); border-radius:8px; padding:10px 12px;
+    font-size:13.5px; display:flex; justify-content:space-between; align-items:center; gap:10px;
+  }
+  .item span.txt{flex:1;}
+  .item button{
+    background:transparent; border:1px solid var(--border); color:var(--muted);
+    padding:4px 8px; font-size:11px; border-radius:6px; white-space:nowrap;
+  }
+  .item button:hover{color:var(--text); border-color:var(--muted);}
+  .off{color:var(--accent2); font-weight:700;}
+  .count{color:var(--muted); font-size:12px; margin-top:8px;}
+  .empty{color:var(--muted); font-size:13px; padding:20px; text-align:center;}
+  .cat-group{margin-bottom:6px;}
+  .cat-title{
+    font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--accent);
+    font-weight:700; margin:14px 0 8px; display:flex; align-items:center; gap:8px;
+  }
+  .cat-title:first-child{margin-top:0;}
+  .cat-title .n{
+    background:#334155; color:var(--muted); font-size:10px; padding:2px 7px;
+    border-radius:999px; font-weight:600;
+  }
+  .cat-title button{
+    margin-left:auto; padding:3px 8px; font-size:10px; background:transparent;
+    border:1px solid var(--border); color:var(--muted);
+  }
+  .cat-ids{
+    background:#111a2e; border:1px dashed var(--border); border-radius:8px;
+    padding:8px 12px; margin:2px 0 12px; font-size:11.5px; font-family:ui-monospace,Menlo,monospace;
+    color:var(--accent2); display:flex; justify-content:space-between; align-items:center; gap:10px;
+    word-break:break-all;
+  }
+  .cat-ids span.txt{flex:1;}
+  .cat-ids button{
+    background:transparent; border:1px solid var(--border); color:var(--muted);
+    padding:4px 8px; font-size:11px; border-radius:6px; white-space:nowrap;
+  }
+  .cat-ids button:hover{color:var(--text); border-color:var(--muted);}
+  .filter-list{display:flex; flex-wrap:wrap; gap:8px;}
+  .filter-chip{
+    display:flex; align-items:center; gap:6px; background:#0b1220;
+    border:1px solid var(--border); border-radius:999px; padding:6px 12px 6px 10px;
+    font-size:12.5px; cursor:pointer; user-select:none;
+  }
+  .filter-chip:hover{border-color:var(--muted);}
+  .filter-chip input{cursor:pointer; accent-color:var(--accent); width:14px; height:14px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Formatador de Ofertas</h1>
+  <p class="sub">Cole a tabela (colunas separadas por tabulação). Aceita dois formatos: <strong>Product_id, DESCR_ITEM, DE, POR, % DESC</strong> (categoria detectada automaticamente) ou <strong>Product_id, CATEGORIA, DESCR_ITEM, DE, POR, % DESC</strong> (usa a categoria já informada na planilha).</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Entrada</h2>
+      <textarea id="input" placeholder="Product_id&#9;CATEGORIA&#9;DESCR_ITEM&#9;DE&#9;POR&#9;% DESC
+2101947632&#9;ANTIALERGICOS&#9;ALLEXOFEDRIN 180MG 10 COMP REV&#9;95,31&#9;28,9&#9;-70%"></textarea>
+      <div class="controls">
+        <button onclick="process()">Gerar</button>
+        <button class="secondary" onclick="document.getElementById('input').value='';process();">Limpar</button>
+        <button class="secondary" onclick="loadSample()">Exemplo</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Saída</h2>
+      <div id="output" class="output-list"><div class="empty">Cole os dados e clique em "Gerar"</div></div>
+      <div class="count" id="count"></div>
+      <div class="controls">
+        <button onclick="copyAll()">Copiar tudo (célula única)</button>
+        <button class="secondary" onclick="copyAllPlain()">Copiar tudo (uma linha por item)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="audienceFilterCard" style="margin-top:20px; display:none;">
+    <h2>Filtrar por público</h2>
+    <p class="sub" style="margin-bottom:0;">Roda antes da categorização — útil para campanhas especiais de criança/bebê: filtre e só aparecem os produtos desse público, já categorizados.</p>
+    <div class="controls">
+      <button id="audBtnTodos" onclick="setAudienceFilter('todos')">Todos</button>
+      <button id="audBtnAdulto" class="secondary" onclick="setAudienceFilter('adulto')">Adulto</button>
+      <button id="audBtnCrianca" class="secondary" onclick="setAudienceFilter('crianca')">Criança e Bebê</button>
+    </div>
+  </div>
+
+  <div class="card" id="categoryFilterCard" style="margin-top:20px; display:none;">
+    <h2>Filtrar por categoria</h2>
+    <div id="categoryFilter" class="filter-list"></div>
+    <div class="controls">
+      <button class="secondary" onclick="selectAllCategories()">Selecionar todas</button>
+      <button class="secondary" onclick="clearCategorySelection()">Limpar seleção</button>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:20px;">
+    <div class="card">
+      <h2>IDs (uma linha, separados por vírgula)</h2>
+      <textarea id="idsOutput" readonly style="min-height:120px; font-size:13px;"></textarea>
+      <div class="controls">
+        <button onclick="copyIds()">Copiar IDs</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>IDs (um por linha)</h2>
+      <textarea id="idsOutputLines" readonly style="min-height:120px; font-size:13px;"></textarea>
+      <div class="controls">
+        <button onclick="copyIdsLines()">Copiar IDs</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Top 125 IDs (maiores descontos por categoria)</h2>
+      <textarea id="idsTop125" readonly style="min-height:120px; font-size:13px;"></textarea>
+      <div class="count" id="top125Count"></div>
+      <div class="controls">
+        <button onclick="copyTop125()">Copiar IDs</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <h2>ITENS BANNER DE OFERTA</h2>
+    <div id="bannerOutput" class="output-list"><div class="empty">Gere os dados para ver os itens do banner</div></div>
+    <div class="count" id="bannerCount"></div>
+    <div class="controls">
+      <button onclick="copyBanner()">Copiar tudo (célula única)</button>
+      <button class="secondary" onclick="copyBannerPlain()">Copiar tudo (uma linha por item)</button>
+    </div>
+
+    <h2 style="margin-top:20px;">IDs do Banner de Oferta (uma linha, separados por vírgula)</h2>
+    <textarea id="bannerIdsOutput" readonly style="min-height:70px; font-size:13px;"></textarea>
+    <div class="controls">
+      <button onclick="copyBannerIds()">Copiar IDs</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <h2>Separação por Faixa de Desconto</h2>
+    <p class="sub" style="margin-bottom:12px;">Visão à parte (não depende da categoria): agrupa os produtos em faixas fixas de % de desconto — 10% a 20%, 30% a 40%, 50% a 60% e 70% a 80%. Itens fora dessas faixas não aparecem aqui.</p>
+    <div id="discountBandsOutput" class="output-list"><div class="empty">Gere os dados para ver a separação por faixa de desconto</div></div>
+    <div class="count" id="discountBandsCount"></div>
+    <div class="controls">
+      <button onclick="copyDiscountBands()">Copiar tudo (célula única)</button>
+      <button class="secondary" onclick="copyDiscountBandsPlain()">Copiar tudo (uma linha por item)</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Dicionário de abreviações comuns -> forma expandida
+const ABBR = {
+  "CRE": "Creme", "CREM": "Creme",
+  "DENT": "Dental", "DENTAL": "Dental",
+  "SAB": "Sabonete", "SABON": "Sabonete",
+  "SHAMP": "Shampoo", "SHAMPO": "Shampoo",
+  "COND": "Condicionador",
+  "DESOD": "Desodorante", "DESO": "Desodorante",
+  "AEROS": "Aerosol", "AER": "Aerosol",
+  "ANTITR": "Antitranspirante",
+  "HIDRAT": "Hidratante",
+  "LOC": "Loção",
+  "ESC": "Escova", "ESCOV": "Escova",
+  "DENTAL.": "Dental",
+  "ENX": "Enxaguante",
+  "BUC": "Bucal",
+  "ABSORV": "Absorvente",
+  "FRALDA": "Fralda",
+  "FRD": "Fralda",
+  "PROT": "Protetor",
+  "SOLAR": "Solar",
+  "MED": "Medicamento",
+  "COMP": "Comprimidos",
+  "CX": "Caixa",
+  "UN": "Unidade",
+  "REF": "Refil",
+  "TALC": "Talco",
+  "INF": "Infantil",
+  "GEL": "Gel",
+  "LIQ": "Líquido",
+  "SUSP": "Suspensão",
+  "VIT": "Vitamina",
+  "MULT": "Multivitamínico",
+  "COL": "Colônia",
+  "PERF": "Perfume",
+  "DES": "Desodorante"
+};
+
+// Palavras que devem ficar em minúsculo (a menos que sejam a 1ª palavra)
+const LOWER_WORDS = new Set(["de","da","do","com","e","para","em"]);
+
+// Marcas/tokens com capitalização própria
+const BRAND_FIX = {
+  "ORAL-B": "Oral-B",
+  "ORALB": "Oral-B",
+  "JOHNSON": "Johnson",
+  "NIVEA": "Nivea",
+  "COLGATE": "Colgate"
+};
+
+function parseNumber(str){
+  return str.trim().replace(/\./g,"").replace(",", ".");
+}
+
+function formatBRL(str){
+  const n = parseFloat(parseNumber(str));
+  if(isNaN(n)) return str;
+  return n.toLocaleString("pt-BR", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function formatDescricao(descr){
+  const tokens = descr.trim().split(/\s+/);
+  const out = [];
+  for(let i=0;i<tokens.length;i++){
+    let raw = tokens[i];
+    let upper = raw.toUpperCase();
+
+    // token com número + unidade colada, ex: 50G, 100ML, 2X50G
+    const unitMatch = raw.match(/^(\d+[Xx]?\d*)(G|ML|L|KG|UN|UNID)$/i);
+    if(unitMatch){
+      out.push(unitMatch[1].toLowerCase().replace('x','x') + unitMatch[2].toLowerCase());
+      continue;
+    }
+
+    if(BRAND_FIX[upper]){
+      out.push(BRAND_FIX[upper]);
+      continue;
+    }
+
+    if(ABBR[upper]){
+      out.push(ABBR[upper]);
+      continue;
+    }
+
+    const lower = raw.toLowerCase();
+    if(i > 0 && LOWER_WORDS.has(lower)){
+      out.push(lower);
+      continue;
+    }
+
+    // título padrão: primeira maiúscula, resto minúsculo, preservando hífens
+    const titled = raw.split('-').map(part =>
+      part.length ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : part
+    ).join('-');
+    out.push(titled);
+  }
+  return out.join(' ');
+}
+
+// Lista curada de marcas de medicamentos/fitoterápicos de balcão comuns em
+// farmácias brasileiras, usada como reforço da categoria "FARMACINHA"
+// (muitos desses nomes não trazem palavras-chave genéricas como "comprimido").
+const MED_BRANDS_RE =
+  "\\b(DESRINITE|HEDERA|ALERGALIV|NEOTOSS|LORATAMED|LORATADIN|CIMEGRIPE|" +
+  "PERFENOL|ALLEXOFEDRIN|NEOLEFRIN|SNIF\\s?AIR|NARIX|CISTEIL|SINUSTRAT|" +
+  "FEXX|CLOP[ÊE]|RINORDIL|VITA\\s?SUPRAZ|NARIDRIN|RINOSORO|VIBRAL|" +
+  "PREVIANE|HISTAMIN|NEOSORO|AMBROXMEL|CORISTINA|SOMINEX|MARACUGINA|" +
+  "MELAGRI[AÃ]O|NASOAR|PEITORAL\\s?MARTEL|EXPECTAMIN|UROCRAN|GEROVITAL|" +
+  "FORTEVIRON|RITMONEURAN|SINTOCALMY|BENEGRIP|BIOGRIPE|RESFENOL|VITAFER|" +
+  "MUCOS|BISOLVON|DESCON\\b|TOSSEXPEC|EXPEC\\b|SECRELISE|NEOPIRIDIN|" +
+  "HISCONGEX|ACEVITON|NERVOCALM|SEDATIF|FITOCALM|NICOBEN)\\b";
+
+// Regras de categoria: cada item = {nome, palavras-chave (regex OR)}
+// Ordem importa: a primeira que bater vence. O foco é cuidado pessoal,
+// dividido em só 6 categorias que fazem sentido no dia a dia da farmácia
+// (sem destrinchar em dezenas de subcategorias): Cuidado Facial, Cuidado
+// Capilar, Cuidado Corporal, Cuidado Oral, Suplementos e Vitaminas e, para
+// tudo que for remédio/item de farmácia caseira (inclusive primeiros
+// socorros), FARMACINHA. Regras mais específicas (rosto, boca) vêm antes
+// das genéricas de corpo, para não "vazar" item facial para corporal.
+const CATEGORY_RULES = [
+  // Cuidado Oral
+  { nome: "Cuidado Oral",        re: /\bCRE(ME)?\s?DEN|\bDENTIFR|\bESC(OVA)?\s?DEN|\bESCOVA\s?EL[EÉ]TRICA|\bREFIL\s?ESCOVA|\bFIO\s?DENT|\bFITA\s?DENT|\bENX\s?BUC\b|\bENXAGUANTE\b/i },
+
+  // Suplementos e Vitaminas
+  { nome: "Suplementos e Vitaminas", re: /\bVIT(AMINA)?\b|\bMULTIVITAM|\bSUPLEMENTO|\bCONDRES\b|\bCOLAGENO\b|\bOMEGA\b|\bCENTRUM\b|\bWHEY\b|\bPROTEIN\b|\bCAFE[IÍ]NA\b|\bCOENZIMA\b|\bTRIPTOFANO\b|\bMELATONINA\b|\bCOMPLEXO\s?B\b|\bPOLIVIT|\bFLEXSIM\b|\bFOCOSIM\b|\bNUTREN\b|\bBIO-?C\b|\bMATERNA\b|\bPOWERADE\b|\bISOTONICO\b/i },
+
+  // Cuidado Facial (rosto/lábios — regras específicas antes das genéricas de corpo)
+  { nome: "Cuidado Facial",      re: /\bFACIAL\b|\bLABIAL\b|\bSERUM\b|\bGEL\s?(LIMP|FAC|ESF)|\bFLUIDO\s?DI[AÁ]RIO\b|\bAUTOBRONZEADOR\b|\bANTI-?IDADE\b|\bEPISOL\b|\bACTINE\b|\bCLEANANCE\b|\bADCOS\b/i },
+
+  // FARMACINHA (remédios e itens de farmácia caseira/primeiros socorros)
+  { nome: "FARMACINHA",          re: new RegExp(MED_BRANDS_RE + "|\\bPASTILHA|\\bPAST\\b|\\bGARGANTA\\b|\\bCIFLOGEX\\b|\\bENDCOFF\\b|\\bCOMP(RIMIDO)?S?\\b|\\bC[AÁ]PSULAS?\\b|CAPS?\\b|\\bXAROPE\\b|\\bXPE\\b|\\bGOTAS\\b|\\bSOL(U[CÇ][AÃ]O)?\\s?OR(AL)?\\b|\\bSPRAY\\s?NASAL\\b|\\bDESCONGEST|\\bVASOCONSTRITOR\\b|SACHE|ENV(ELOPE)?S?\\b|CPR?\\b|\\d+\\s?MG\\b|\\bTERM[OÔ]METRO\\b|\\bALGOD[AÃ]O\\b|\\bCURATIVO\\b|\\bATADURA\\b|\\bSORO\\b", "i") },
+
+  // Cuidado Capilar
+  { nome: "Cuidado Capilar",     re: /\bCONDICIONADOR\b|\bSHAMP(OO)?\b|\bSH\s+H&S\b|\bM[AÁ]SC(ARA)?\s?TRAT|\bTONICO\s?CAP|\bCREME\s?PENT|\bAMPOLA|\bESCOVA\s?CAB\b|\bLANOSSI\b|\bELAST\b|\bSCRUNCHIE\b|\bGEL\s?FIX|\bFIXADOR\b|\bIMPERMEABILIZ/i },
+
+  // Cuidado Corporal (tudo mais de cuidado pessoal: corpo, higiene íntima,
+  // bebê, barbear, unhas, perfumaria — para não fragmentar em dezenas de
+  // categorias pequenas)
+  { nome: "Cuidado Corporal",    re: /\bREPELENTE\b|\bRAID\b|\bEXPOSIS\b|\bOFF\s?(KIDS|FAMILY|AEROSOL|ACTIVE|GEL)\b|\bPROTETOR\s?SOL|\bPROT\.?\s?SOL\b|\bFPS\s?\d|\bABSORVENTE\b|\bABS\b|\bALWAYS\b|\bPLENITUD\b|\bROUPA\s?INT|\bFRALDA|\bFRD\b|\bSAB(ON(ETE)?)?\b|\bDESO?D(ORANTE)?\b|\bDEOS?\b|\bANTITR|\bROLL[\s-]?ON\b|\bAXE\b|\bHIDRA|\bHID\b|\bLOC(AO|ÃO)?\b|\bLC\s?HIDR|\bAP\.?\s?(BAR|BARBA|DEP|DEPIL)\b|\bLAMINA\b|\bGILLETTE\b|\bCREME\s?DEP\b|\bCERA\s?DEP\b|\bP[OÓ]S\s?BARBA\b|\bK\s?-?\s?Y\b|\bLUBRIFICANTE\b|\bESMALTE\b|\bESM\b|\bREMOVEDOR\b|\bCUTICULA\b|\bRISQUE\b|\bMUCILON\b|\bNINHO\b|\bCOL(ONIA)?\b|\bPERF(UME)?\b|\bTALC/i },
+];
+
+function detectCategoria(descr){
+  const upper = descr.toUpperCase();
+  for(const rule of CATEGORY_RULES){
+    if(rule.re.test(upper)) return rule.nome;
+  }
+  return "Outros";
+}
+
+function formatDesconto(str){
+  let s = str.trim().replace('%','').replace('-','').trim();
+  return s + '%';
+}
+
+// Aceita dois formatos, separados por TAB:
+//   5 colunas: Product_id, DESCR_ITEM, DE, POR, % DESC        (categoria é detectada automaticamente)
+//   6+ colunas: Product_id, CATEGORIA, DESCR_ITEM, DE, POR, % DESC  (usa a categoria já informada)
+function parseLine(line){
+  const cols = line.split('\t');
+  if(cols.length < 5) return null;
+
+  let id, categoria, descr, de, por, desc;
+  if(cols.length >= 6){
+    [id, categoria, descr, de, por, desc] = cols;
+  } else {
+    [id, descr, de, por, desc] = cols;
+    categoria = null;
+  }
+
+  if(!id || !id.trim()) return null;
+  if(!descr || !descr.trim()) return null;
+
+  return {
+    id: id.trim(),
+    categoria: categoria && categoria.trim() ? categoria.trim() : null,
+    descr: descr.trim(),
+    de: de.trim(),
+    por: por.trim(),
+    desc: desc.trim()
+  };
+}
+
+// Deixa a categoria vinda da planilha em Title Case (mantém conectores em
+// minúsculo e espaça a barra "/") em vez de usar tudo em maiúsculo.
+function normalizeCategoria(str){
+  const smallWords = new Set(["de","da","do","e","com","para","em"]);
+  const spaced = str.trim().replace(/\s*\/\s*/g, ' / ');
+  return spaced.split(/\s+/).map((w, i) => {
+    if(w === '/') return '/';
+    const lower = w.toLowerCase();
+    if(i > 0 && smallWords.has(lower)) return lower;
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join(' ');
+}
+
+function stripAccents(str){
+  const map = {
+    'á':'a','à':'a','ã':'a','â':'a','ä':'a',
+    'é':'e','è':'e','ê':'e','ë':'e',
+    'í':'i','ì':'i','î':'i','ï':'i',
+    'ó':'o','ò':'o','õ':'o','ô':'o','ö':'o',
+    'ú':'u','ù':'u','û':'u','ü':'u',
+    'ç':'c','ñ':'n',
+    'Á':'A','À':'A','Ã':'A','Â':'A','Ä':'A',
+    'É':'E','È':'E','Ê':'E','Ë':'E',
+    'Í':'I','Ì':'I','Î':'I','Ï':'I',
+    'Ó':'O','Ò':'O','Õ':'O','Ô':'O','Ö':'O',
+    'Ú':'U','Ù':'U','Û':'U','Ü':'U',
+    'Ç':'C','Ñ':'N'
+  };
+  return str.split('').map(ch => map[ch] || ch).join('');
+}
+
+// Chave "canônica" de uma categoria vinda da planilha: sem acento, maiúscula,
+// sem pontuação de borda e com espaçamento/barra padronizados — assim
+// "CREME / SPRAY PARA PENTEAR" e "CREME/SPRAY PARA PENTEAR" batem igual.
+function normalizeKey(raw){
+  return stripAccents(raw.trim().toUpperCase())
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/\s+/g, ' ')
+    .replace(/[.,]+$/, '');
+}
+
+// Categorias (como vêm na coluna CATEGORIA da planilha) que representam
+// medicamentos/fármacos propriamente ditos — sempre agrupadas em
+// "FARMACINHA", em vez de manter a subcategoria terapêutica original.
+// Vitaminas/suplementos ficam de fora de propósito (são regulatoriamente
+// diferentes de medicamento); ajuste esta lista se precisar incluí-los.
+const MED_CATEGORY_NAMES = new Set([
+  "ANTIALERGICOS",
+  "ANALGESICOS E ANTITERMICOS",
+  "ANTIGRIPAIS",
+  "TOSSE",
+  "IRRITACAO GARGANTA",
+  "DESCONGESTIONANTES",
+  "DESCONGESTIONANTES NASAIS",
+  "AZIA E MA DIGESTAO",
+  "GASES",
+  "LAXANTES",
+  "ANTI-HEMORROIDAIS",
+  "ANTITABAGISMO",
+  "ANTIMICOTICOS",
+  "ANTIPARASITARIOS",
+  "SOLUCOES FISIOLOGICAS",
+  "REIDRATACAO",
+  "LAGRIMAS ARTIFICIAIS",
+  "PROBIOTICOS",
+  "ASSADURAS",
+  "REDUCAO COLESTEROL",
+  "ENERGIZANTES",
+  "CUIDADOS COM A BOCA",
+  "REGULADORES DE APETITE",
+  "DOR E CONTUSAO",
+  "GRIPES",
+  "GRIPES E RESFRIADOS",
+  "FERIMENTOS",
+  "FERIMENTOS E CONTUSOES",
+  "DOR E FEBRE",
+  "PRIMEIROS SOCORROS",
+  "GASTROINTESTINAIS",
+  "PELE E MUCOSAS",
+  "PELE E MUCOSAS INFANTIL",
+  // itens de farmácia caseira / primeiros socorros também caem em FARMACINHA
+  "TERMOMETROS",
+  "BOLSA",
+  "ALGODOES",
+  "OFICINAIS",
+  // termos genéricos que às vezes vêm direto na coluna CATEGORIA
+  "MEDICAMENTOS",
+  "MEDICAMENTO",
+  "FARMACIA",
+  "REMEDIOS",
+  "REMEDIO",
+].map(normalizeKey));
+
+// Demais categorias da planilha, agrupadas nas mesmas 6 categorias "guarda-
+// chuva" de cuidado pessoal usadas na detecção automática (CATEGORY_RULES):
+// Cuidado Facial, Cuidado Capilar, Cuidado Corporal, Cuidado Oral e
+// Suplementos e Vitaminas — sem fragmentar em dezenas de subcategorias.
+// Tudo que for remédio já cai em FARMACINHA via MED_CATEGORY_NAMES acima.
+const CATEGORY_GROUP_MAP = new Map([
+  // Cuidado Oral
+  ["CREME DENTAL", "Cuidado Oral"],
+  ["HIGIENE BUCAL", "Cuidado Oral"],
+  ["ESCOVA DENTAL REGULAR", "Cuidado Oral"],
+  ["FIO E FITA DENTAL", "Cuidado Oral"],
+  ["ENXAGUATORIO", "Cuidado Oral"],
+
+  // Cuidado Facial
+  ["PROTETOR SOLAR FACIAL", "Cuidado Facial"],
+  ["HIDRATANTES LABIAIS", "Cuidado Facial"],
+  ["AUTOBRONZEADOR", "Cuidado Facial"],
+  ["ANTI-IDADE", "Cuidado Facial"],
+  ["PROTETOR SOLAR DERMOCOSMETICO", "Cuidado Facial"],
+
+  // Cuidado Capilar
+  ["CONDICIONADOR", "Cuidado Capilar"],
+  ["SHAMPOO", "Cuidado Capilar"],
+  ["MODELADORES", "Cuidado Capilar"],
+  ["TRATAMENTO", "Cuidado Capilar"],
+  ["CREME/SPRAY PARA PENTEAR", "Cuidado Capilar"],
+
+  // Suplementos e Vitaminas
+  ["VITAMINAS AZ", "Suplementos e Vitaminas"],
+  ["MULTIVITAMINICOS", "Suplementos e Vitaminas"],
+  ["SUPLEMENTOS/NATURAIS", "Suplementos e Vitaminas"],
+
+  // Cuidado Corporal (corpo, higiene íntima, bebê, barbear, unhas —
+  // agrupados aqui para não fragmentar em muitas categorias pequenas)
+  ["SABONETE LIQUIDO", "Cuidado Corporal"],
+  ["PACK SABONETE BARRA", "Cuidado Corporal"],
+  ["REFIL SABONETE LIQUIDO", "Cuidado Corporal"],
+  ["BANHO/POS BANHO", "Cuidado Corporal"],
+  ["HIDRATANTES", "Cuidado Corporal"],
+  ["AEROSSOL", "Cuidado Corporal"],
+  ["ROLL-ON", "Cuidado Corporal"],
+  ["REPELENTE", "Cuidado Corporal"],
+  ["REPELENTE ELETRICO", "Cuidado Corporal"],
+  ["ABSORVENTE EXTERNO", "Cuidado Corporal"],
+  ["PRESERVATIVO", "Cuidado Corporal"],
+  ["LUBRIFICANTE", "Cuidado Corporal"],
+  ["FRALDA DESCARTAVEL", "Cuidado Corporal"],
+  ["LENCO UMEDECIDO", "Cuidado Corporal"],
+  ["LEITE EM PO", "Cuidado Corporal"],
+  ["CREME PREVENTIVO P/ASSADURAS", "Cuidado Corporal"],
+  ["APARELHO BARBEAR", "Cuidado Corporal"],
+  ["APARELHO DEPILATORIO", "Cuidado Corporal"],
+  ["LAMINA", "Cuidado Corporal"],
+  ["ESMALTACAO", "Cuidado Corporal"],
+].map(([k, v]) => [normalizeKey(k), v]));
+
+function resolveCategoria(item){
+  if(!item.categoria) return detectCategoria(item.descr);
+
+  const key = normalizeKey(item.categoria);
+
+  if(MED_CATEGORY_NAMES.has(key)) return "FARMACINHA";
+
+  // "Não definido" não é uma categoria terapêutica de verdade — nesse caso,
+  // tenta detectar pela descrição; se parecer remédio, cai em FARMACINHA.
+  if(key === "NAO DEFINIDO"){
+    const auto = detectCategoria(item.descr);
+    return auto === "FARMACINHA" ? "FARMACINHA" : normalizeCategoria(item.categoria);
+  }
+
+  if(CATEGORY_GROUP_MAP.has(key)) return CATEGORY_GROUP_MAP.get(key);
+
+  return normalizeCategoria(item.categoria);
+}
+
+// Detecta o público do produto (independente da categoria): "crianca"
+// (inclui bebê) ou "adulto". Usado pelo filtro de público, que roda ANTES
+// da categorização visual — permite isolar só produtos infantis/de bebê
+// (ex.: para campanhas especiais) mantendo a categorização normal.
+// Olha tanto a categoria da planilha (ex.: "Pele e Mucosas Infantil") quanto
+// a descrição do produto (ex.: "FRALDA PAMPERS RN", "SHAMPOO INFANTIL").
+const KIDS_RE = /INFANTIL|\bBEBE\b|\bBABY\b|\bKIDS\b|CRIAN[CÇ]A|RECEM[\s-]?NASCIDO|\bJUNIOR\b|\bTEEN\b|\bRN\b/;
+
+function detectAudience(descr, categoria){
+  const catUpper = categoria ? stripAccents(categoria).toUpperCase() : '';
+  const descUpper = stripAccents(descr || '').toUpperCase();
+  if(KIDS_RE.test(catUpper) || KIDS_RE.test(descUpper)) return 'crianca';
+  return 'adulto';
+}
+
+function buildText(item){
+  const descrFmt = formatDescricao(item.descr);
+  const deFmt = formatBRL(item.de);
+  const porFmt = formatBRL(item.por);
+  const descFmt = formatDesconto(item.desc);
+  return `ID ${item.id} | ${descrFmt} — DE R$ ${deFmt} POR R$ ${porFmt} (${descFmt} OFF)`;
+}
+
+function descontoNumerico(str){
+  const n = parseFloat(str.trim().replace('%','').replace('-','').replace(',','.'));
+  return isNaN(n) ? 0 : n;
+}
+
+// Seleciona até n IDs, "rodando" pelas categorias (na ordem de sortedCats) e
+// pegando sempre o próximo item de MAIOR desconto ainda não escolhido em cada
+// categoria. Assim todas as categorias ficam representadas, priorizando
+// sempre o maior desconto dentro de cada uma, até somar n produtos no total.
+function computeTopN(groups, sortedCats, n){
+  const pointers = new Map();
+  sortedCats.forEach(c => pointers.set(c, 0));
+  const selected = [];
+  let progress = true;
+  while(selected.length < n && progress){
+    progress = false;
+    for(const cat of sortedCats){
+      if(selected.length >= n) break;
+      const items = groups.get(cat);
+      const idx = pointers.get(cat);
+      if(idx < items.length){
+        selected.push(items[idx].id);
+        pointers.set(cat, idx + 1);
+        progress = true;
+      }
+    }
+  }
+  return selected;
+}
+
+// Faixas fixas de % de desconto para a visão "Separação por Faixa de
+// Desconto" — à parte da divisão por categoria. Só essas 4 faixas; itens
+// com desconto fora delas (ex.: 25%, 45%, 90%) simplesmente não aparecem
+// nessa visão (continuam normalmente na Saída por categoria).
+const DISCOUNT_BANDS = [
+  { label: "10% a 20%", min: 10, max: 20 },
+  { label: "30% a 40%", min: 30, max: 40 },
+  { label: "50% a 60%", min: 50, max: 60 },
+  { label: "70% a 80%", min: 70, max: 80 },
+];
+
+// Estado "cheio" (sem filtro) da última geração — usado pelo filtro de
+// categorias para re-renderizar sem precisar reprocessar o texto colado.
+let ALL_GROUPS = null;       // Map categoria -> [{id, text, desconto, audience}, ...] (já ordenado por desconto)
+let ALL_SORTED_CATS = [];    // ordem de exibição das categorias
+let ALL_DUP_COUNT = 0;
+let SELECTED_CATS = new Set(); // categorias marcadas no filtro
+let AUDIENCE_FILTER = 'todos'; // 'todos' | 'adulto' | 'crianca' — filtro de público (roda antes da categorização)
+
+function process(){
+  const raw = document.getElementById('input').value;
+  const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length);
+
+  // agrupa por categoria, preservando ordem de primeira aparição
+  const groups = new Map();
+  const seenIds = new Set();
+  let total = 0;
+  let dupCount = 0;
+
+  for(const line of lines){
+    if(/^product_id/i.test(line)) continue; // pula cabeçalho
+    const item = parseLine(line);
+    if(!item) continue;
+    if(seenIds.has(item.id)){
+      dupCount++;
+      continue; // remove duplicado (mesmo Product_id)
+    }
+    seenIds.add(item.id);
+
+    const categoria = resolveCategoria(item);
+    const text = buildText(item);
+    const desconto = descontoNumerico(item.desc);
+    const audience = detectAudience(item.descr, item.categoria);
+    if(!groups.has(categoria)) groups.set(categoria, []);
+    groups.get(categoria).push({id: item.id, text, desconto, audience});
+    total++;
+  }
+
+  if(total === 0){
+    ALL_GROUPS = null;
+    ALL_SORTED_CATS = [];
+    ALL_DUP_COUNT = 0;
+    SELECTED_CATS = new Set();
+    renderAudienceFilter();
+    renderCategoryFilter();
+    renderOutput();
+    return;
+  }
+
+  // ordena cada categoria por maior desconto primeiro
+  for(const items of groups.values()){
+    items.sort((a,b) => b.desconto - a.desconto);
+  }
+
+  // ordena categorias alfabeticamente, com "Outros" por último
+  const sortedCats = [...groups.keys()].sort((a,b) => {
+    if(a === "Outros") return 1;
+    if(b === "Outros") return -1;
+    return a.localeCompare(b, 'pt-BR');
+  });
+
+  ALL_GROUPS = groups;
+  ALL_SORTED_CATS = sortedCats;
+  ALL_DUP_COUNT = dupCount;
+  SELECTED_CATS = new Set(sortedCats); // por padrão, tudo selecionado
+
+  renderAudienceFilter();
+  renderCategoryFilter();
+  renderOutput();
+}
+
+// Desenha os botões do filtro de público (Todos / Adulto / Criança e Bebê).
+// Mostra o card sempre que houver dados, independente da seleção atual.
+function renderAudienceFilter(){
+  const wrap = document.getElementById('audienceFilterCard');
+  wrap.style.display = ALL_SORTED_CATS.length ? '' : 'none';
+  updateAudienceButtons();
+}
+
+function updateAudienceButtons(){
+  const map = { todos: 'audBtnTodos', adulto: 'audBtnAdulto', crianca: 'audBtnCrianca' };
+  for(const [key, id] of Object.entries(map)){
+    const btn = document.getElementById(id);
+    if(!btn) continue;
+    btn.className = key === AUDIENCE_FILTER ? '' : 'secondary';
+  }
+}
+
+function setAudienceFilter(value){
+  AUDIENCE_FILTER = value;
+  updateAudienceButtons();
+  renderOutput();
+}
+
+// Desenha os "chips" de categoria (checkbox) a partir de ALL_SORTED_CATS.
+function renderCategoryFilter(){
+  const wrap = document.getElementById('categoryFilterCard');
+  const container = document.getElementById('categoryFilter');
+  container.innerHTML = '';
+
+  if(!ALL_SORTED_CATS.length){
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+
+  for(const cat of ALL_SORTED_CATS){
+    const label = document.createElement('label');
+    label.className = 'filter-chip';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = SELECTED_CATS.has(cat);
+    checkbox.addEventListener('change', () => {
+      if(checkbox.checked) SELECTED_CATS.add(cat);
+      else SELECTED_CATS.delete(cat);
+      renderOutput();
+    });
+
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(cat));
+    container.appendChild(label);
+  }
+}
+
+function selectAllCategories(){
+  if(!ALL_SORTED_CATS.length) return;
+  SELECTED_CATS = new Set(ALL_SORTED_CATS);
+  renderCategoryFilter();
+  renderOutput();
+}
+
+function clearCategorySelection(){
+  SELECTED_CATS = new Set();
+  renderCategoryFilter();
+  renderOutput();
+}
+
+// Re-renderiza TUDO (Saída, campos de IDs, Top 125, Banner) considerando
+// apenas as categorias marcadas em SELECTED_CATS. Não reprocessa o texto
+// colado — trabalha em cima de ALL_GROUPS/ALL_SORTED_CATS já calculados.
+function renderOutput(){
+  const output = document.getElementById('output');
+  const countEl = document.getElementById('count');
+  const bannerOutput = document.getElementById('bannerOutput');
+  const bannerCountEl = document.getElementById('bannerCount');
+  const discountBandsOutput = document.getElementById('discountBandsOutput');
+  const discountBandsCountEl = document.getElementById('discountBandsCount');
+  output.innerHTML = '';
+  bannerOutput.innerHTML = '';
+  discountBandsOutput.innerHTML = '';
+
+  function resetAllFields(emptyMsg, emptyBannerMsg, emptyDiscountMsg){
+    output.innerHTML = `<div class="empty">${emptyMsg}</div>`;
+    countEl.textContent = '';
+    document.getElementById('idsOutput').value = '';
+    document.getElementById('idsOutputLines').value = '';
+    document.getElementById('idsTop125').value = '';
+    document.getElementById('top125Count').textContent = '';
+    bannerOutput.innerHTML = `<div class="empty">${emptyBannerMsg}</div>`;
+    bannerCountEl.textContent = '';
+    document.getElementById('bannerIdsOutput').value = '';
+    discountBandsOutput.innerHTML = `<div class="empty">${emptyDiscountMsg || emptyBannerMsg}</div>`;
+    discountBandsCountEl.textContent = '';
+    window._results = [];
+    window._groups = null;
+    window._idGroups = null;
+    window._bannerGroups = null;
+    window._bannerResults = [];
+    window._bannerIds = [];
+    window._discountGroups = null;
+    window._discountIdGroups = null;
+    window._discountResults = [];
+  }
+
+  if(!ALL_GROUPS){
+    resetAllFields(
+      'Nenhum item reconhecido. Verifique se os campos estão separados por TAB.',
+      'Gere os dados para ver os itens do banner',
+      'Gere os dados para ver a separação por faixa de desconto'
+    );
+    return;
+  }
+
+  const catsAfterCategoryFilter = ALL_SORTED_CATS.filter(c => SELECTED_CATS.has(c));
+
+  if(catsAfterCategoryFilter.length === 0){
+    resetAllFields(
+      'Nenhuma categoria selecionada. Marque ao menos uma no filtro acima.',
+      'Nenhuma categoria selecionada.',
+      'Nenhuma categoria selecionada.'
+    );
+    return;
+  }
+
+  // Filtro de público (Adulto / Criança e Bebê) — roda ANTES da exibição por
+  // categoria: recorta os itens de cada categoria pelo público escolhido e
+  // descarta categorias que ficarem sem nenhum item para esse público.
+  // "groups"/"sortedCats" daqui pra baixo já refletem esse recorte.
+  const groups = new Map();
+  for(const cat of catsAfterCategoryFilter){
+    const items = ALL_GROUPS.get(cat).filter(
+      it => AUDIENCE_FILTER === 'todos' || it.audience === AUDIENCE_FILTER
+    );
+    if(items.length) groups.set(cat, items);
+  }
+  const sortedCats = catsAfterCategoryFilter.filter(c => groups.has(c));
+
+  if(sortedCats.length === 0){
+    const audienceLabel = AUDIENCE_FILTER === 'crianca' ? 'Criança e Bebê' : AUDIENCE_FILTER === 'adulto' ? 'Adulto' : '';
+    resetAllFields(
+      `Nenhum produto para o público "${audienceLabel}" nas categorias marcadas.`,
+      `Nenhum produto para o público "${audienceLabel}" nas categorias marcadas.`,
+      `Nenhum produto para o público "${audienceLabel}" nas categorias marcadas.`
+    );
+    return;
+  }
+
+  const OUTPUT_N = 20; // prioriza até 20 produtos por categoria (maior desconto) na Saída
+  const ids = [];
+  let total = 0;
+  for(const cat of sortedCats){
+    const items = groups.get(cat).slice(0, OUTPUT_N);
+    total += items.length;
+    for(const it of items) ids.push(it.id);
+  }
+
+  document.getElementById('idsOutput').value = ids.join(',');
+  document.getElementById('idsOutputLines').value = ids.join('\n');
+
+  const TOP_N = 125;
+  const top125 = computeTopN(groups, sortedCats, TOP_N);
+  document.getElementById('idsTop125').value = top125.join(',');
+  document.getElementById('top125Count').textContent =
+    top125.length < TOP_N
+      ? `${top125.length} id(s) (catálogo tem menos que ${TOP_N} produtos únicos)`
+      : `${top125.length} ids`;
+
+  const BANNER_N = 1;
+
+  const flatResults = [];
+  const textGroups = new Map();
+  const idGroups = new Map();
+  const bannerGroups = new Map();
+  const bannerResults = [];
+  const bannerIds = [];
+  let bannerTotal = 0;
+
+  for(const cat of sortedCats){
+    const allItems = groups.get(cat);
+    const items = allItems.slice(0, OUTPUT_N);
+    const texts = items.map(i => i.text);
+    const catIds = items.map(i => i.id);
+    textGroups.set(cat, texts);
+    idGroups.set(cat, catIds);
+    flatResults.push(...texts);
+
+    const countLabel = allItems.length > items.length
+      ? `${items.length} de ${allItems.length}`
+      : `${items.length}`;
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'cat-title';
+    titleDiv.innerHTML = `${cat} <span class="n">${countLabel}</span> <button onclick="copyCategory(this,'${cat.replace(/'/g,"\\'")}')">Copiar categoria</button>`;
+    output.appendChild(titleDiv);
+
+    for(const text of texts){
+      const div = document.createElement('div');
+      div.className = 'item';
+      div.innerHTML = `<span class="txt">${text}</span><button onclick="copyOne(this)">Copiar</button>`;
+      output.appendChild(div);
+    }
+
+    const idsLine = document.createElement('div');
+    idsLine.className = 'cat-ids';
+    idsLine.innerHTML = `<span class="txt">Todos os ids: ${catIds.join(',')}</span><button onclick="copyOne(this)">Copiar IDs</button>`;
+    output.appendChild(idsLine);
+
+    // Itens Banner de Oferta: os BANNER_N com maior desconto de cada categoria
+    // (items já vem ordenado por desconto desc). Sem separação por categoria
+    // na exibição — lista única, plana, com todos os itens do banner.
+    const bannerTexts = texts.slice(0, BANNER_N);
+    const bannerCatIds = catIds.slice(0, BANNER_N);
+    bannerGroups.set(cat, bannerTexts);
+    bannerResults.push(...bannerTexts);
+    bannerIds.push(...bannerCatIds);
+    bannerTotal += bannerTexts.length;
+  }
+
+  // Lista plana dos itens do banner, sem cabeçalho de categoria.
+  for(const text of bannerResults){
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `<span class="txt">${text}</span><button onclick="copyOne(this)">Copiar</button>`;
+    bannerOutput.appendChild(div);
+  }
+
+  // IDs de TODOS os produtos do banner, de TODAS as categorias (filtradas)
+  // juntos — aparece só uma vez, no final.
+  const bannerAllIdsDiv = document.createElement('div');
+  bannerAllIdsDiv.className = 'cat-ids';
+  bannerAllIdsDiv.innerHTML = `<span class="txt">Todos os ids: ${bannerIds.join(',')}</span><button onclick="copyOne(this)">Copiar IDs</button>`;
+  bannerOutput.appendChild(bannerAllIdsDiv);
+
+  const filterNote = sortedCats.length < ALL_SORTED_CATS.length
+    ? ` · filtro: ${sortedCats.length}/${ALL_SORTED_CATS.length} categoria(s)`
+    : '';
+  countEl.textContent = `${total} item(ns) em ${sortedCats.length} categoria(s) (até ${OUTPUT_N} por categoria, maior desconto)`
+    + (ALL_DUP_COUNT > 0 ? ` · ${ALL_DUP_COUNT} duplicado(s) removido(s) no total` : '')
+    + filterNote;
+  bannerCountEl.textContent = `${bannerTotal} item(ns) — maior desconto de cada categoria (até ${BANNER_N} por categoria, sem separação por categoria)`;
+  document.getElementById('bannerIdsOutput').value = bannerIds.join(',');
+  window._results = flatResults;
+  window._groups = textGroups;
+  window._idGroups = idGroups;
+  window._bannerGroups = bannerGroups;
+  window._bannerResults = bannerResults;
+  window._bannerIds = bannerIds;
+
+  // ---- Separação por Faixa de Desconto (à parte, não depende de categoria) ----
+  // Usa TODOS os itens das categorias filtradas (não limitado aos 20 por
+  // categoria da Saída), juntando todas as categorias numa pool só e
+  // distribuindo em faixas fixas de % de desconto.
+  const allFilteredItems = [];
+  for(const cat of sortedCats){
+    allFilteredItems.push(...groups.get(cat));
+  }
+
+  const discountGroups = new Map();
+  const discountIdGroups = new Map();
+  const discountResults = [];
+  let discountTotal = 0;
+
+  for(const band of DISCOUNT_BANDS){
+    const bandItems = allFilteredItems
+      .filter(it => it.desconto >= band.min && it.desconto <= band.max)
+      .sort((a, b) => b.desconto - a.desconto);
+    const bandTexts = bandItems.map(i => i.text);
+    const bandIds = bandItems.map(i => i.id);
+    discountGroups.set(band.label, bandTexts);
+    discountIdGroups.set(band.label, bandIds);
+    discountResults.push(...bandTexts);
+    discountTotal += bandTexts.length;
+
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'cat-title';
+    titleDiv.innerHTML = `${band.label} <span class="n">${bandTexts.length}</span> <button onclick="copyDiscountBand(this,'${band.label.replace(/'/g,"\\'")}')">Copiar faixa</button>`;
+    discountBandsOutput.appendChild(titleDiv);
+
+    if(bandTexts.length === 0){
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'empty';
+      emptyDiv.textContent = 'Nenhum item nessa faixa.';
+      discountBandsOutput.appendChild(emptyDiv);
+      continue;
+    }
+
+    for(const text of bandTexts){
+      const div = document.createElement('div');
+      div.className = 'item';
+      div.innerHTML = `<span class="txt">${text}</span><button onclick="copyOne(this)">Copiar</button>`;
+      discountBandsOutput.appendChild(div);
+    }
+
+    const idsLine = document.createElement('div');
+    idsLine.className = 'cat-ids';
+    idsLine.innerHTML = `<span class="txt">Todos os ids: ${bandIds.join(',')}</span><button onclick="copyOne(this)">Copiar IDs</button>`;
+    discountBandsOutput.appendChild(idsLine);
+  }
+
+  discountBandsCountEl.textContent = `${discountTotal} item(ns) nas faixas cadastradas (de ${allFilteredItems.length} no total das categorias selecionadas)`;
+  window._discountGroups = discountGroups;
+  window._discountIdGroups = discountIdGroups;
+  window._discountResults = discountResults;
+}
+
+function escapeHtml(str){
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Copia texto simples + uma versão HTML (célula única) ao mesmo tempo.
+// Apps como Google Sheets/Docs leem o HTML (cola tudo numa célula só);
+// apps que só aceitam texto puro (WhatsApp, editores simples) recebem o texto plano.
+async function writeRichClipboard(plainText, htmlText, btn){
+  try{
+    const item = new ClipboardItem({
+      'text/plain': new Blob([plainText], {type:'text/plain'}),
+      'text/html': new Blob([htmlText], {type:'text/html'})
+    });
+    await navigator.clipboard.write([item]);
+  } catch(e){
+    await navigator.clipboard.writeText(plainText);
+  }
+  if(btn){
+    const old = btn.textContent;
+    btn.textContent = 'Copiado!';
+    setTimeout(() => btn.textContent = old, 1200);
+  }
+}
+
+function copyOne(btn){
+  const text = btn.previousElementSibling.textContent;
+  navigator.clipboard.writeText(text);
+  btn.textContent = 'Copiado!';
+  setTimeout(() => btn.textContent = 'Copiar', 1200);
+}
+
+// Monta o HTML como UMA célula só: <table> com uma única linha/coluna,
+// e as quebras de linha viram <br/> DENTRO dessa célula (em vez de <tr>
+// separadas). Assim, ao colar no Google Sheets, tudo cai numa célula com
+// texto quebrado internamente — não distribui em várias linhas da planilha,
+// o que evita o erro de "interseção parcial com mesclagem".
+// Obs: o Google Sheets não aplica negrito parcial em HTML colado de fora —
+// se qualquer trecho tem negrito, ele aplica na célula inteira. Por isso
+// aqui tudo fica em texto normal (sem <b>), para não bagunçar a formatação.
+function wrapSingleCell(htmlLineFragments){
+  return `<table><tbody><tr><td>${htmlLineFragments.join('<br/>')}</td></tr></tbody></table>`;
+}
+
+async function copyCategory(btn, cat){
+  if(!window._groups || !window._groups.has(cat)) return;
+  const items = window._groups.get(cat);
+  const plainLines = items.slice();
+  const htmlLines = items.map(it => escapeHtml(it));
+
+  if(window._idGroups && window._idGroups.has(cat)){
+    const idsStr = window._idGroups.get(cat).join(',');
+    plainLines.push(`Todos os ids: ${idsStr}`);
+    htmlLines.push(escapeHtml(`Todos os ids: ${idsStr}`));
+  }
+
+  const plainText = plainLines.join('\n');
+  const htmlText = wrapSingleCell(htmlLines);
+  await writeRichClipboard(plainText, htmlText, btn);
+}
+
+function buildAllLines(){
+  let plainLines = [];
+  let htmlLines = [];
+
+  if(window._groups){
+    for(const [cat, items] of window._groups){
+      const catLabel = cat.toUpperCase();
+      plainLines.push(catLabel);
+      htmlLines.push(escapeHtml(catLabel));
+
+      for(const it of items){
+        plainLines.push(it);
+        htmlLines.push(escapeHtml(it));
+      }
+
+      if(window._idGroups && window._idGroups.has(cat)){
+        const idsStr = window._idGroups.get(cat).join(',');
+        plainLines.push(`Todos os ids: ${idsStr}`);
+        htmlLines.push(escapeHtml(`Todos os ids: ${idsStr}`));
+      }
+
+      plainLines.push('');
+      htmlLines.push('');
+    }
+    while(plainLines.length && plainLines[plainLines.length-1] === '') plainLines.pop();
+    while(htmlLines.length && htmlLines[htmlLines.length-1] === '') htmlLines.pop();
+  } else {
+    plainLines = window._results.slice();
+    htmlLines = plainLines.map(l => escapeHtml(l));
+  }
+
+  return { plainLines, htmlLines };
+}
+
+async function copyAll(){
+  if(!window._results || !window._results.length) return;
+  const btn = event.target;
+  const { plainLines, htmlLines } = buildAllLines();
+  const plainText = plainLines.join('\n');
+  const htmlText = wrapSingleCell(htmlLines);
+  await writeRichClipboard(plainText, htmlText, btn);
+}
+
+async function copyAllPlain(){
+  if(!window._results || !window._results.length) return;
+  const btn = event.target;
+  const { plainLines } = buildAllLines();
+  const plainText = plainLines.join('\n');
+  await navigator.clipboard.writeText(plainText);
+  const old = btn.textContent;
+  btn.textContent = 'Copiado!';
+  setTimeout(() => btn.textContent = old, 1200);
+}
+
+// ---- Itens Banner de Oferta (top 1 por categoria, lista única sem separação por categoria) ----
+
+// Monta: lista plana de todos os itens do banner (sem cabeçalho de categoria)
+// e, no FINAL, uma única linha com os ids de TODOS os produtos juntos.
+function buildBannerLines(){
+  const plainLines = (window._bannerResults || []).slice();
+  const htmlLines = plainLines.map(l => escapeHtml(l));
+
+  if(window._bannerIds && window._bannerIds.length){
+    const idsLine = `Todos os ids: ${window._bannerIds.join(',')}`;
+    plainLines.push('');
+    plainLines.push(idsLine);
+    htmlLines.push('');
+    htmlLines.push(escapeHtml(idsLine));
+  }
+
+  return { plainLines, htmlLines };
+}
+
+async function copyBanner(){
+  if(!window._bannerResults || !window._bannerResults.length) return;
+  const btn = event.target;
+  const { plainLines, htmlLines } = buildBannerLines();
+  const plainText = plainLines.join('\n');
+  const htmlText = wrapSingleCell(htmlLines);
+  await writeRichClipboard(plainText, htmlText, btn);
+}
+
+async function copyBannerPlain(){
+  if(!window._bannerResults || !window._bannerResults.length) return;
+  const btn = event.target;
+  const { plainLines } = buildBannerLines();
+  const plainText = plainLines.join('\n');
+  await navigator.clipboard.writeText(plainText);
+  const old = btn.textContent;
+  btn.textContent = 'Copiado!';
+  setTimeout(() => btn.textContent = old, 1200);
+}
+
+function copyBannerIds(){
+  const el = document.getElementById('bannerIdsOutput');
+  if(!el.value) return;
+  navigator.clipboard.writeText(el.value);
+  const btn = event.target;
+  const old = btn.textContent;
+  btn.textContent = 'Copiado!';
+  setTimeout(() => btn.textContent = old, 1200);
+}
+
+// ---- Separação por Faixa de Desconto ----
+
+async function copyDiscountBand(btn, label){
+  if(!window._discountGroups || !window._discountGroups.has(label)) return;
+  const items = window._discountGroups.get(label);
+  const plainLines = items.slice();
+  const htmlLines = items.map(it => escapeHtml(it));
+
+  if(window._discountIdGroups && window._discountIdGroups.has(label)){
+    const idsStr = window._discountIdGroups.get(label).join(',');
+    plainLines.push(`Todos os ids: ${idsStr}`);
+    htmlLines.push(escapeHtml(`Todos os ids: ${idsStr}`));
+  }
+
+  const plainText = plainLines.join('\n');
+  const htmlText = wrapSingleCell(htmlLines);
+  await writeRichClipboard(plainText, htmlText, btn);
+}
+
+function buildDiscountBandsLines(){
+  let plainLines = [];
+  let htmlLines = [];
+
+  if(window._discountGroups){
+    for(const [label, items] of window._discountGroups){
+      plainLines.push(label.toUpperCase());
+      htmlLines.push(escapeHtml(label.toUpperCase()));
+
+      if(items.length === 0){
+        plainLines.push('(nenhum item nessa faixa)');
+        htmlLines.push(escapeHtml('(nenhum item nessa faixa)'));
+      }
+
+      for(const it of items){
+        plainLines.push(it);
+        htmlLines.push(escapeHtml(it));
+      }
+
+      if(window._discountIdGroups && window._discountIdGroups.has(label) && items.length){
+        const idsStr = window._discountIdGroups.get(label).join(',');
+        plainLines.push(`Todos os ids: ${idsStr}`);
+        htmlLines.push(escapeHtml(`Todos os ids: ${idsStr}`));
+      }
+
+      plainLines.push('');
+      htmlLines.push('');
+    }
+    while(plainLines.length && plainLines[plainLines.length-1] === '') plainLines.pop();
+    while(htmlLines.length && htmlLines[htmlLines.length-1] === '') htmlLines.pop();
+  } else {
+    plainLines = (window._discountResults || []).slice();
+    htmlLines = plainLines.map(l => escapeHtml(l));
+  }
+
+  return { plainLines, htmlLines };
+}
+
+async function copyDiscountBands(){
+  if(!window._discountResults || !window._discountResults.length) return;
+  const btn = event.target;
+  const { plainLines, htmlLines } = buildDiscountBandsLines();
+  const plainText = plainLines.join('\n');
+  const htmlText = wrapSingleCell(htmlLines);
+  await writeRichClipboard(plainText, htmlText, btn);
+}
+
+async function copyDiscountBandsPlain(){
+  if(!window._discountResults || !window._discountResults.length) return;
+  const btn = event.target;
+  const { plainLines } = buildDiscountBandsLines();
+  const plainText = plainLines.join('\n');
+  await navigator.clipboard.writeText(plainText);
+  const old = btn.textContent;
+  btn.textContent = 'Copiado!';
+  setTimeout(() => btn.textContent = old, 1200);
+}
+
+function copyIds(){
+  const el = document.getElementById('idsOutput');
+  if(!el.value) return;
+  navigator.clipboard.writeText(el.value);
+  const btn = event.target;
+  const old = btn.textContent;
+  btn.textContent = 'Copiado!';
+  setTimeout(() => btn.textContent = old, 1200);
+}
+
+function copyIdsLines(){
+  const el = document.getElementById('idsOutputLines');
+  if(!el.value) return;
+  navigator.clipboard.writeText(el.value);
+  const btn = event.target;
+  const old = btn.textContent;
+  btn.textContent = 'Copiado!';
+  setTimeout(() => btn.textContent = old, 1200);
+}
+
+function copyTop125(){
+  const el = document.getElementById('idsTop125');
+  if(!el.value) return;
+  navigator.clipboard.writeText(el.value);
+  const btn = event.target;
+  const old = btn.textContent;
+  btn.textContent = 'Copiado!';
+  setTimeout(() => btn.textContent = old, 1200);
+}
+
+function loadSample(){
+  document.getElementById('input').value =
+`Product_id\tCATEGORIA\tDESCR_ITEM\tDE\tPOR\t% DESC
+2101947632\tANTIALERGICOS\tALLEXOFEDRIN 180MG 10 COMP REV\t95,31\t28,9\t-70%
+902522656\tANTIALERGICOS\tDESRINITE 180MG 10CP\t78,57\t23,99\t-69%
+2140825210\tSUPLEMENTOS/NATURAIS\tMELATONINA NEO QUIMICA MARACUJA 90CP\t101,26\t32,99\t-67%
+2093908045\tCREME DENTAL\tCRE DENT ORAL-B STAGES 100G\t16,99\t14,9\t-12%
+2093908227\tCREME DENTAL\tCRE DENT ORAL-B STAGES 100G\t15,99\t14,9\t-7%`;
+  process();
+}
+
+loadSample();
+</script>
+</body>
+</html>
