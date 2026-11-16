@@ -95,13 +95,29 @@
   .cat-select:hover{color:var(--text); border-color:var(--muted);}
   button:disabled{opacity:.45; cursor:default; filter:none;}
   @media(max-width:600px){ .item{flex-wrap:wrap;} .item span.txt{flex-basis:100%; order:3;} .item button{order:2; margin-left:auto;} }
+  .day-controls{display:flex; flex-wrap:wrap; gap:12px;}
+  .day-controls label{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted);}
+  .day-controls input, .day-controls select{
+    background:#0b1220; color:var(--text); border:1px solid var(--border); border-radius:6px;
+    padding:6px 8px; font-size:12.5px; color-scheme:dark;
+  }
+  .day-list{display:flex; flex-direction:column; gap:6px; max-height:360px; overflow-y:auto;}
+  .day-row{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#0b1220;
+    border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:13px;
+  }
+  .day-row.active{border-color:var(--accent);}
+  .day-row .day-label{min-width:150px;}
+  .day-row .day-label .n{background:#334155; color:var(--muted); font-size:10px; padding:2px 7px; border-radius:999px;}
+  .day-row .day-count{color:var(--muted); flex:1; font-size:12px;}
+  .day-row button{padding:5px 10px; font-size:11.5px;}
   .filter-chip input{cursor:pointer; accent-color:var(--accent); width:14px; height:14px;}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Formatador de Ofertas</h1>
-  <p class="sub">Cole a tabela (colunas separadas por tabulação). Com cabeçalho, as colunas são lidas pelo nome, em qualquer ordem (<strong>Product_id, DESCR_ITEM, DE, POR, % DESC</strong> e, se quiser, <strong>CATEGORIA</strong>); colunas extras são ignoradas. <strong>Sem coluna de categoria, ela é tirada do nome do produto.</strong> O % de desconto é calculado se não vier.</p>
+  <p class="sub">Cole a tabela (colunas separadas por tabulação). Com cabeçalho, as colunas são lidas pelo nome, em qualquer ordem (<strong>Product_id, DESCR_ITEM, DE, POR, % DESC</strong> e, se quiser, <strong>CATEGORIA</strong>); colunas extras são ignoradas. <strong>Sem coluna de categoria, ela é tirada do nome do produto.</strong> O % de desconto é calculado se não vier. Com colunas <strong>INÍCIO</strong> e <strong>FIM</strong>, aparece a separação por dia.</p>
 
   <div class="grid">
     <div class="card">
@@ -123,6 +139,29 @@
         <button onclick="copyAll()">Copiar tudo (célula única)</button>
         <button class="secondary" onclick="copyAllPlain()">Copiar tudo (uma linha por item)</button>
       </div>
+    </div>
+  </div>
+
+  <div class="card" id="dayCard" style="margin-top:20px; display:none;">
+    <h2>Separação por dia</h2>
+    <p class="sub" style="margin-bottom:12px;">Cada produto vale do INÍCIO ao FIM. Clique em <strong>Ver este dia</strong> para a plataforma inteira (Saída, IDs, Top 125, Banner e Faixas) mostrar só o que está em oferta naquele dia, ou copie cada dia direto, no mesmo formato da Saída. As cópias respeitam os filtros de público e categoria.</p>
+    <div class="day-controls">
+      <label>De <input type="date" id="dayFrom" onchange="setDayRange()"></label>
+      <label>Até <input type="date" id="dayTo" onchange="setDayRange()"></label>
+      <label>Datas da planilha
+        <select id="dateFormat" onchange="setDateFormat(this.value)">
+          <option value="auto">Automático</option>
+          <option value="dmy">dia/mês/ano</option>
+          <option value="mdy">mês/dia/ano</option>
+        </select>
+      </label>
+    </div>
+    <div class="count" id="dayInfo" style="margin:10px 0;"></div>
+    <div id="dayList" class="day-list"></div>
+    <div class="count" id="dayStatus" style="margin-top:10px;"></div>
+    <div class="controls">
+      <button id="dayAllBtn" onclick="setDayFilter('todos')">Todos os dias (sem filtro)</button>
+      <button class="secondary" onclick="copyAllDays(this)">Copiar todos os dias do período</button>
     </div>
   </div>
 
@@ -337,8 +376,10 @@ const CAT = {
   COR:  "Cuidado Corporal",
   ORAL: "Cuidado Oral",
   MAQ:  "Maquiagem e Unhas",
+  ALI:  "Alimentos e Snacks",
+  BEB:  "Bebidas",
 };
-const ALL_CATEGORY_NAMES = [CAT.FARM, CAT.FAC, CAT.CAP, CAT.COR, CAT.ORAL, CAT.SUP, CAT.MAQ, "Outros"];
+const ALL_CATEGORY_NAMES = [CAT.FARM, CAT.FAC, CAT.CAP, CAT.COR, CAT.ORAL, CAT.SUP, CAT.MAQ, CAT.ALI, CAT.BEB, "Outros"];
 
 // Abreviações usadas SÓ para entender o produto (não mudam o texto exibido)
 const MATCH_ABBR = {
@@ -357,7 +398,7 @@ const MATCH_ABBR = {
   VIT:"VITAMINA", MULTIVIT:"MULTIVITAMINICO", POLIVIT:"POLIVITAMINICO",
   ESM:"ESMALTE", PERF:"PERFUME", COL:"COLONIA", MASC:"MASCARA",
   INF:"INFANTIL", LIQ:"LIQUIDO", FAC:"FACIAL", CORP:"CORPORAL", CAPIL:"CAPILAR",
-  PROTSOL:"PROTETOR SOLAR", UMED:"UMEDECIDOS", UMEDEC:"UMEDECIDOS", LC:"LOCAO", AP:"APARELHO", REP:"REPELENTE",
+  PROTSOL:"PROTETOR SOLAR", REFRIG:"REFRIGERANTE", REFRI:"REFRIGERANTE", BISC:"BISCOITO", CHOC:"CHOCOLATE", SALG:"SALGADINHO", BEB:"BEBIDA", ENERG:"ENERGETICO", UMED:"UMEDECIDOS", UMEDEC:"UMEDECIDOS", LC:"LOCAO", AP:"APARELHO", REP:"REPELENTE",
 };
 
 // Texto canônico para comparação: sem acento, maiúsculo, unidades
@@ -374,7 +415,7 @@ function matchText(str){
 
 // Marcas de medicamentos/fitoterápicos de balcão (muitas não trazem
 // palavras como "comprimido" na descrição).
-const MED_BRANDS = /\b(DESRINITE|HEDERA|ALERGALIV|NEOTOSS|LORATAMED|LORATADINA|LORATADIN|CIMEGRIPE|PERFENOL|ALLEXOFEDRIN|ALLEGRA|NEOLEFRIN|SNIF ?AIR|NARIX|CISTEIL|SINUSTRAT|FEXX|CLOPE|RINORDIL|VITA SUPRAZ|NARIDRIN|RINOSORO|VIBRAL|PREVIANE|HISTAMIN|NEOSORO|AMBROXMEL|AMBROXOL|CORISTINA|SOMINEX|MARACUGINA|MELAGRIAO|NASOAR|PEITORAL MARTEL|EXPECTAMIN|UROCRAN|GEROVITAL|FORTEVIRON|RITMONEURAN|SINTOCALMY|BENEGRIP|BIOGRIPE|RESFENOL|MUCOSOLVAN|BISOLVON|DESCON|TOSSEXPEC|SECRELISE|NEOPIRIDIN|HISCONGEX|ACEVITON|NERVOCALM|SEDATIF|FITOCALM|NICOBEN|NICORETTE|DORFLEX|NEOSALDINA|TYLENOL|NOVALGINA|DIPIRONA|PARACETAMOL|IBUPROFENO|ADVIL|BUSCOPAN|ENGOV|EPOCLER|ESTOMAZIL|SONRISAL|SAL DE FRUTA|ENO|GAVISCON|LUFTAL|DRAMIN|ELMA ?CHIPS|ESTOMAZIL|NEOSORO|SORINE|MERTHIOLATE|NEBACETIN|BEPANTOL|HIPOGLOS|CICATRICURE|SALONPAS|GELOL|CATAFLAM|TORSILAX|CIFLOGEX|STREPSILS|ENDCOFF|BENALET|DECONGEX|CLARITIN|POLARAMINE|ATROVERAN|DOMPERIDONA|OMEPRAZOL|LACTO ?PURGA|DULCOLAX|TAMARINE|NATURETTI|LACTOSIL|FLORATIL|REPOFLOR|ENTEROGERMINA|SIMETICONA|DORALGINA|ANADOR|DIPIRONA|LISADOR|AAS|ASPIRINA|ALIVIUM|NIMESULIDA|MAALOX|PEPSAMAR|MYLANTA|ESTOMAZIL)\b/;
+const MED_BRANDS = /\b(DESRINITE|HEDERA|ALERGALIV|NEOTOSS|LORATAMED|LORATADINA|LORATADIN|CIMEGRIPE|PERFENOL|ALLEXOFEDRIN|ALLEGRA|NEOLEFRIN|SNIF ?AIR|NARIX|CISTEIL|SINUSTRAT|FEXX|CLOPE|RINORDIL|VITA SUPRAZ|NARIDRIN|RINOSORO|VIBRAL|PREVIANE|HISTAMIN|NEOSORO|AMBROXMEL|AMBROXOL|CORISTINA|SOMINEX|MARACUGINA|MELAGRIAO|NASOAR|PEITORAL MARTEL|EXPECTAMIN|UROCRAN|GEROVITAL|FORTEVIRON|RITMONEURAN|SINTOCALMY|BENEGRIP|BIOGRIPE|RESFENOL|MUCOSOLVAN|BISOLVON|DESCON|TOSSEXPEC|SECRELISE|NEOPIRIDIN|HISCONGEX|ACEVITON|NERVOCALM|SEDATIF|FITOCALM|NICOBEN|NICORETTE|DORFLEX|NEOSALDINA|TYLENOL|NOVALGINA|DIPIRONA|PARACETAMOL|IBUPROFENO|ADVIL|BUSCOPAN|ENGOV|EPOCLER|ESTOMAZIL|SONRISAL|SAL DE FRUTA|ENO|GAVISCON|LUFTAL|DRAMIN|ESTOMAZIL|NEOSORO|SORINE|MERTHIOLATE|NEBACETIN|BEPANTOL|HIPOGLOS|CICATRICURE|SALONPAS|GELOL|CATAFLAM|TORSILAX|CIFLOGEX|STREPSILS|ENDCOFF|BENALET|DECONGEX|CLARITIN|POLARAMINE|ATROVERAN|DOMPERIDONA|OMEPRAZOL|LACTO ?PURGA|DULCOLAX|TAMARINE|NATURETTI|LACTOSIL|FLORATIL|REPOFLOR|ENTEROGERMINA|SIMETICONA|DORALGINA|ANADOR|DIPIRONA|LISADOR|AAS|ASPIRINA|ALIVIUM|NIMESULIDA|MAALOX|PEPSAMAR|MYLANTA|ESTOMAZIL)\b/;
 
 // [categoria, peso, regex (sobre o texto canônico), motivo legível]
 const SIGNALS = [
@@ -406,9 +447,9 @@ const SIGNALS = [
   [CAT.ORAL, 6,  /\b(COLGATE|ORAL ?-?B|SORRISO|SENSODYNE|LISTERINE|CLOSE ?UP|CURAPROX|PARODONTAX|ELMEX|COREGA|PLAX|TANDY|PERIOGARD|BITUFO|MALVATRICIN)\b/, "marca de higiene bucal"],
 
   // ---------- Suplementos e Vitaminas ----------
-  [CAT.SUP, 10, /\bSUPLEMENTOS?\b|\bMULTIVITAMINICO\b|\bPOLIVITAMINICO\b|\bWHEY\b|\bPROTEINA\b|\bPROTEIN\b|\bCREATINA\b|\bCOLAGENO\b|\bOMEGA ?3\b|\bOLEO DE PEIXE\b|\bMELATONINA\b|\bBIOTINA\b|\bCOENZIMA\b|\bTRIPTOFANO\b|\bMAGNESIO\b|\bCALCIO\b|\bZINCO\b|\bCOMPLEXO B\b|\bISOTONICO\b|\bBARRA DE PROTEINA\b|\bGLUTAMINA\b|\bBCAA\b|\bCAFEINA\b|\bSPIRULINA\b|\bCHA (VERDE|DE HIBISCO)\b|\bLUTEINA\b|\bPOLIVITAMINICOS?\b/, "suplemento"],
+  [CAT.SUP, 10, /\bSUPLEMENTOS?\b|\bMULTIVITAMINICO\b|\bPOLIVITAMINICO\b|\bWHEY\b|\bPROTEINA\b|\bPROTEIN\b|\bCREATINA\b|\bCOLAGENO\b|\bOMEGA ?3\b|\bOLEO DE PEIXE\b|\bMELATONINA\b|\bBIOTINA\b|\bCOENZIMA\b|\bTRIPTOFANO\b|\bMAGNESIO\b|\bCALCIO\b|\bZINCO\b|\bCOMPLEXO B\b|\bBARRA DE PROTEINA\b|\bGLUTAMINA\b|\bBCAA\b|\bCAFEINA\b|\bSPIRULINA\b|\bCHA (VERDE|DE HIBISCO)\b|\bLUTEINA\b|\bPOLIVITAMINICOS?\b/, "suplemento"],
   [CAT.SUP, 8,  /\bVITAMINAS?\b|\bVITAMINA ?[ABCDEK] ?\d*\b|\bD3\b|\bB12\b/, "vitamina"],
-  [CAT.SUP, 6,  /\b(CENTRUM|SUPRADYN|LAVITAN|ADDERA|NATURES BOUNTY|FLEXSIM|FOCOSIM|NUTREN|SUSTAGEN|ENSURE|MATERNA|POWERADE|GATORADE|GROWTH|MAX TITANIUM|INTEGRALMEDICA|PUROSHAPE|OSTEONUTRI|CEWIN|REDOXON|BIO ?-?C|ESTER ?-?C|VITAFER|CONDRES|SANAVITA|NEO QUIMICA VITAMINA|DUOVIT|MEMORIOL|PHARMATON|GINSENG)\b/, "marca de suplemento"],
+  [CAT.SUP, 6,  /\b(CENTRUM|SUPRADYN|LAVITAN|ADDERA|NATURES BOUNTY|FLEXSIM|FOCOSIM|NUTREN|SUSTAGEN|ENSURE|MATERNA|GROWTH|MAX TITANIUM|INTEGRALMEDICA|PUROSHAPE|OSTEONUTRI|CEWIN|REDOXON|BIO ?-?C|ESTER ?-?C|VITAFER|CONDRES|SANAVITA|NEO QUIMICA VITAMINA|DUOVIT|MEMORIOL|PHARMATON|GINSENG)\b/, "marca de suplemento"],
 
   // ---------- FARMACINHA (remédios e farmácia caseira) ----------
   [CAT.FARM, 10, MED_BRANDS, "marca de medicamento"],
@@ -431,6 +472,17 @@ const SIGNALS = [
   [CAT.COR, 9,  /\bLEITE EM PO\b|\bFORMULA INFANTIL\b|\bMUCILON\b|\bNINHO\b|\bAPTAMIL\b|\bNAN\b|\bMILNUTRI\b|\bMAMADEIRAS?\b|\bCHUPETAS?\b|\bMORDEDOR\b|\bBICOS?\b|\bCOPO DE TRANSICAO\b|\bCOTONETE INFANTIL\b/, "itens de bebê"],
   [CAT.COR, 6,  /\bCORPORA(L|IS)\b|\bCORPO\b|\bBANHO\b|\bMAOS\b|\bPES\b|\bINTIM(O|A)\b|\bAXILAS?\b|\bPELE EXTRASSECA\b|\bBARBA\b/, "uso no corpo"],
   [CAT.COR, 4,  /\b(REXONA|DOVE|NIVEA|AXE|GILLETTE|ALWAYS|INTIMUS|CAREFREE|PAMPERS|HUGGIES|MAMYPOKO|TURMA DA MONICA|PERSONAL|PROTEX|LUX|PALMOLIVE|JOHNSONS?|GRANADO|MONANGE|DAVENE|OFF|EXPOSIS|SBP|RAID|JONTEX|PRUDENCE|OLLA|K ?-?Y|SUNDOWN|BANANA BOAT|PLENITUD|TENA|BIGFRAL|NEUTROX|ABOVE|BOZZANO|MEMPHIS|NUPY|SPEED STICK|OLD SPICE|BIC|PRESTOBARBA|VENUS|SCHICK|EUDORA|NATURA|BOTICARIO|ALBANY|FRANCIS|PHEBO|NEEDS|DERMACYD|LUCRETIN|GIOVANNA BABY|PEDIASURE)\b/, "marca de cuidado corporal"],
+
+  // ---------- Bebidas (no fim da lista: em empate, as categorias de farmácia vencem) ----------
+  [CAT.BEB, 10, /\bREFRIGERANTES?\b|\bAGUA (MINERAL|DE COCO|COM GAS|SEM GAS|TONICA|GASEIFICADA|SABORIZADA)\b|\bENERGETICOS?\b|\bISOTONICOS?\b|\bBEBIDA (LACTEA|ISOTONICA|ENERGETICA|VEGETAL)\b|\bKOMBUCHA\b|\bCHA GELADO\b|\bICE ?TEA\b|\bCAFE (PRONTO|GELADO|EM LATA)\b|\bCAPPUCCINO PRONTO\b|\bLEITE (UHT|INTEGRAL|DESNATADO|SEMI ?DESNATADO|ZERO LACTOSE)\b|\bNECTAR\b|\bTONICA\b|\bLEITE FERMENTADO\b/, "bebida"],
+  [CAT.BEB, 8,  /\bSUCOS?\b|\bBEBIDAS?\b|\bACHOCOLATADO PRONTO\b|\bLONG ?NECK\b/, "bebida"],
+  [CAT.BEB, 6,  /\b(COCA ?-?COLA|PEPSI|GUARANA|ANTARCTICA|SPRITE|FANTA|SCHWEPPES|RED ?BULL|MONSTER|TNT|BURN|GATORADE|POWERADE|DEL ?VALLE|ADES|YAKULT|CRYSTAL|BONAFONT|MINALBA|LINDOYA|PUREZA VITAL|SAO LOURENCO|PERRIER|SAN PELLEGRINO|MAGUARY|SUFRESH|NATURAL ONE|DO BEM|MATTE LEAO|LIPTON|H2OH|AQUARIUS|KAPO|TODDYNHO|NESCAU PRONTO)\b/, "marca de bebida"],
+  [CAT.BEB, 4,  /\bLATA\b|\bGARRAFA\b|\b\d+ ?L\b|\b(250|269|290|310|330|350|473|500|510|600) ?ML\b/, "embalagem de bebida"],
+
+  // ---------- Alimentos e Snacks ----------
+  [CAT.ALI, 10, /\bBOMBONS?\b|\bBARRA DE (CHOCOLATE|CEREAL|CEREAIS|FRUTAS|NUTS)\b|\bBARRINHAS?\b|\bBALAS?\b|\bDROPS\b|\bPIRULITOS?\b|\bGOMA DE MASCAR\b|\bCHICLETES?\b|\bBISCOITOS?\b|\bBOLACHAS?\b|\bWAFERS?\b|\bCOOKIES?\b|\bSALGADINHOS?\b|\bBATATA (CHIPS|PALHA|FRITA|ONDULADA)\b|\bCHIPS\b|\bAMENDOINS?\b|\bCASTANHAS?\b|\bMIX DE (NUTS|CASTANHAS|SEMENTES)\b|\bNUTS\b|\bCEREAL MATINAL\b|\bGRANOLA\b|\bAVEIA\b|\bPIPOCA\b|\bTORRADAS?\b|\bBOLINHOS?\b|\bPACOCA\b|\bGELATINA\b|\bSNACKS?\b|\bMACARRAO INSTANTANEO\b|\bMIOJO\b|\bCHOCOLATE (AO LEITE|AMARGO|BRANCO|MEIO AMARGO)\b|\bCONFEITOS?\b|\bMARSHMALLOW\b|\bPASTILHAS? (DE )?(MENTA|HORTELA)\b|\bADOCANTE\b|\bMEL\b/, "alimento/snack"],
+  [CAT.ALI, 8,  /\bCHOCOLATES?\b|\bDOCES?\b|\bALIMENTOS?\b|\bCEREAIS\b/, "alimento/snack"],
+  [CAT.ALI, 6,  /\b(LACTA|GAROTO|KIT ?KAT|BIS|TALENTO|SONHO DE VALSA|OURO BRANCO|FERRERO|KINDER|M ?& ?M S?|HERSHEYS?|TRIDENT|HALLS|MENTOS|TIC ?TAC|FINI|DORITOS|RUFFLES|PRINGLES|CHEETOS|ELMA ?CHIPS|FANDANGOS|NUTRY|TRIO|BAUDUCCO|OREO|NEGRESCO|TRAKINAS|PASSATEMPO|CLUB SOCIAL|BELIVE|MAGIC TOAST|JASMINE|MAVALERIO|LINEA|NESFIT|QUAKER|KELLOGGS|SUCRILHOS|NESCAU CEREAL|DAVIDA|FLOW|BOLD|NUTS ?FOR|MR ?BEY|DUX|YOKI|PIPPOS|FREEGELLS|BUBBALOO|CHITA|WICKBOLD|ZERO CAL|STEVITA|FINN|TAL E QUAL)\b/, "marca de alimento/snack"],
 ];
 
 // Categorias da planilha (coluna CATEGORIA) que são remédio de verdade
@@ -465,11 +517,16 @@ const CATEGORY_GROUP_MAP = new Map([
   ["FRALDA DESCARTAVEL", CAT.COR], ["LENCO UMEDECIDO", CAT.COR], ["LEITE EM PO", CAT.COR],
   ["CREME PREVENTIVO P/ASSADURAS", CAT.COR], ["APARELHO BARBEAR", CAT.COR],
   ["APARELHO DEPILATORIO", CAT.COR], ["LAMINA", CAT.COR], ["PERFUMARIA", CAT.COR],
+  ["ALIMENTOS", CAT.ALI], ["ALIMENTO", CAT.ALI], ["SNACKS", CAT.ALI], ["SNACK", CAT.ALI], ["BOMBONIERE", CAT.ALI],
+  ["CHOCOLATES", CAT.ALI], ["BISCOITOS", CAT.ALI], ["GULOSEIMAS", CAT.ALI], ["DOCES", CAT.ALI], ["BALAS", CAT.ALI],
+  ["BALAS E GOMAS", CAT.ALI], ["CEREAIS", CAT.ALI], ["BARRA DE CEREAL", CAT.ALI], ["ADOCANTES", CAT.ALI],
+  ["BEBIDAS", CAT.BEB], ["BEBIDA", CAT.BEB], ["REFRIGERANTES", CAT.BEB], ["AGUAS", CAT.BEB], ["AGUA", CAT.BEB],
+  ["SUCOS", CAT.BEB], ["ENERGETICOS", CAT.BEB], ["ISOTONICOS", CAT.BEB], ["CHAS", CAT.BEB],
 ].map(([k, v]) => [normalizeKey(k), v]));
 
 // Categorias da planilha "genéricas", que não dizem o tipo do produto
 // (público, campanha, etc.) — nesses casos só a descrição decide.
-const NEUTRAL_CATEGORY_NAMES = new Set(["NAO DEFINIDO","INFANTIL","OUTROS","DIVERSOS","GERAL","PROMOCAO","OFERTA","BELEZA","HIGIENE","HIGIENE PESSOAL","PERFUMARIA E COSMETICOS"].map(normalizeKey));
+const NEUTRAL_CATEGORY_NAMES = new Set(["NAO DEFINIDO","INFANTIL","OUTROS","DIVERSOS","GERAL","PROMOCAO","OFERTA","BELEZA","HIGIENE","HIGIENE PESSOAL","PERFUMARIA E COSMETICOS","CONVENIENCIA","MERCEARIA","ALIMENTOS E BEBIDAS"].map(normalizeKey));
 
 // Soma os sinais de um texto no mapa de pontuação.
 function addSignals(scores, text, bonus, origem){
@@ -538,8 +595,7 @@ function classifyItem(item){
 function detectCategoria(descr){ return classifyItem({descr, categoria: null}).categoria; }
 
 function formatDesconto(str){
-  let s = str.trim().replace('%','').replace('-','').trim();
-  return s + '%';
+  return Math.round(descontoNumerico(str)) + '%';
 }
 
 // ---------------------------------------------------------------------
@@ -564,10 +620,12 @@ function detectHeader(line){
   const map = {};
   map.id = find(c => /^(PRODUCT ?ID|PRODUTO ID|ID|ID PRODUTO|SKU|COD(IGO)?|COD PRODUTO|EAN)$/.test(c));
   map.desc = find(c => /%|^DESCONTO|^DESC$|^OFF$|PERCENTUAL/.test(c));
-  map.de = find(c => /^DE$|PRECO DE|DE R|PRECO ORIGINAL|PRECO CHEIO|^PRECO$|^ORIGINAL/.test(c));
-  map.por = find(c => /^POR$|PRECO POR|POR R|PRECO PROMO|PROMOCIONAL|^PROMO/.test(c));
+  map.de = find(c => /^DE$|^DE |PRECO DE|DE R|PRECO ORIGINAL|PRECO CHEIO|^PRECO$|^ORIGINAL/.test(c));
+  map.por = find(c => /^POR$|^POR |PRECO POR|POR R|PRECO PROMO|PROMOCIONAL|^PROMO/.test(c));
   map.categoria = find(c => /CATEGORIA|^GRUPO|DEPARTAMENTO|SECAO|^CAT\b/.test(c));
-  const used = [map.id, map.desc, map.de, map.por, map.categoria].filter(i => i >= 0);
+  map.inicio = find(c => /^(DATA |DT )?(INICIO|INI)$|^START$|^VIGENCIA INICIO/.test(c));
+  map.fim = find(c => /^(DATA |DT )?(FIM|TERMINO|FINAL)$|^(VALIDADE|END|ATE)$|^VIGENCIA FIM/.test(c));
+  const used = [map.id, map.desc, map.de, map.por, map.categoria, map.inicio, map.fim].filter(i => i >= 0);
   map.descr = find(c => /DESCR|^PRODUTO|NOME|^ITEM/.test(c), used);
   // é cabeçalho se achou ao menos o nome do produto + algum preço
   if(map.descr < 0 || (map.de < 0 && map.por < 0)) return null;
@@ -584,7 +642,7 @@ function calcDesconto(de, por){
   return Math.round((1 - p / d) * 100) + '%';
 }
 
-function finishItem(id, categoria, descr, de, por, desc){
+function finishItem(id, categoria, descr, de, por, desc, inicioRaw, fimRaw){
   if(!id || !String(id).trim()) return null;
   if(!descr || !String(descr).trim()) return null;
   de = (de || '').trim(); por = (por || '').trim(); desc = (desc || '').trim();
@@ -593,7 +651,9 @@ function finishItem(id, categoria, descr, de, por, desc){
     id: String(id).trim(),
     categoria: categoria && String(categoria).trim() ? String(categoria).trim() : null,
     descr: String(descr).trim(),
-    de, por, desc
+    de, por, desc,
+    inicioRaw: (inicioRaw || '').trim() || null,
+    fimRaw: (fimRaw || '').trim() || null
   };
 }
 
@@ -602,20 +662,24 @@ function parseLine(line, colMap){
 
   if(colMap){
     const get = k => colMap[k] >= 0 ? (cols[colMap[k]] || '') : '';
-    return finishItem(get('id'), get('categoria'), get('descr'), get('de'), get('por'), get('desc'));
+    let headerId = get('id');
+    if(isDateCell(headerId)) headerId = (cols.find(c => /^\d{4,}$/.test(c.trim())) || '').trim();
+    return finishItem(headerId, get('categoria'), get('descr'), get('de'), get('por'), get('desc'), get('inicio'), get('fim'));
   }
 
-  // Sem cabeçalho: reconhece cada célula pelo conteúdo
+  // Sem cabeçalho: reconhece cada célula pelo conteúdo. Datas viram
+  // INÍCIO/FIM (na ordem em que aparecem); o ID é a 1ª coluna que não for
+  // data ou, se ela for data, o primeiro número longo da linha.
   const cells = cols.map(c => c.trim());
-  const id = cells[0];
-  const texts = [], prices = [];
-  let desc = '';
-  for(let i = 1; i < cells.length; i++){
+  const dates = [], texts = [], prices = [];
+  let id = '', desc = '';
+  for(let i = 0; i < cells.length; i++){
     const c = cells[i];
     if(!c) continue;
+    if(isDateCell(c)){ dates.push(c); continue; }
+    if(!id && (i === 0 || /^\d{4,}$/.test(c))){ id = c; continue; }
     if(PCT_RE.test(c)){ if(!desc) desc = c; continue; }
     if(PRICE_RE.test(c)){ prices.push(c); continue; }
-    if(/^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(c)) continue; // datas (INÍCIO/FIM)
     texts.push(c);
   }
   if(!texts.length || prices.length < 2) return null;
@@ -623,8 +687,57 @@ function parseLine(line, colMap){
   let categoria = null, descr;
   if(texts.length >= 2){ categoria = texts[0]; descr = texts[1]; }
   else descr = texts[0];
-  return finishItem(id, categoria, descr, prices[0], prices[1], desc);
+  return finishItem(id, categoria, descr, prices[0], prices[1], desc, dates[0], dates[1]);
 }
+
+// ---------------------------------------------------------------------
+// Datas (INÍCIO / FIM)
+// ---------------------------------------------------------------------
+// Aceita dia/mês/ano, mês/dia/ano (padrão do Excel em inglês) e ano-mês-dia.
+// No modo automático o formato é deduzido do lote inteiro: se algum
+// "primeiro número" passa de 12 é dia/mês; se algum "segundo número" passa
+// de 12 é mês/dia. Se ficar ambíguo, assume mês/dia/ano (como o Excel
+// exporta) — dá para forçar no seletor "Datas da planilha".
+const DATE_RE = /^(\d{1,4})[\/\-.](\d{1,2})[\/\-.](\d{1,4})$/;
+function isDateCell(s){ return DATE_RE.test(String(s || '').trim()); }
+
+function detectDateFormat(strs){
+  let dmy = false, mdy = false;
+  for(const s of strs){
+    const m = String(s).trim().match(DATE_RE);
+    if(!m || m[1].length === 4) continue;
+    if(+m[1] > 12) dmy = true;
+    if(+m[2] > 12) mdy = true;
+  }
+  if(dmy && !mdy) return 'dmy';
+  return 'mdy';
+}
+
+function parseDateStr(s, fmt){
+  const m = String(s || '').trim().match(DATE_RE);
+  if(!m) return null;
+  let y, mo, d;
+  if(m[1].length === 4){ y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else {
+    y = +m[3]; if(y < 100) y += 2000;
+    if(fmt === 'dmy'){ d = +m[1]; mo = +m[2]; } else { mo = +m[1]; d = +m[2]; }
+  }
+  if(mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+function todayISO(){
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+}
+function addDays(iso, n){
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + n));
+  return dt.toISOString().slice(0, 10);
+}
+function fmtBR(iso){ const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; }
+const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+function weekday(iso){ const [y, m, d] = iso.split('-').map(Number); return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]; }
 
 // Deixa a categoria vinda da planilha em Title Case (mantém conectores em
 // minúsculo e espaça a barra "/") em vez de usar tudo em maiúsculo.
@@ -768,37 +881,240 @@ let AUDIENCE_FILTER = 'todos'; // 'todos' | 'adulto' | 'crianca' — filtro de p
 
 let ALL_ITEMS = [];           // itens lidos da entrada (já sem duplicados), na ordem colada
 
+let ALL_ROWS = [];            // todas as linhas lidas (com INÍCIO/FIM), inclusive repetidas
+let DAY_FILTER = 'todos';     // 'todos' ou um dia 'AAAA-MM-DD'
+let DAY_FROM = null, DAY_TO = null; // período mostrado em "Separação por dia"
+let DATE_FORMAT_PREF = 'auto';
+let DATE_FORMAT_USED = null;
+const OUTPUT_PER_CAT = 20;    // até 20 produtos por categoria (maior desconto)
+
 function process(){
   const raw = document.getElementById('input').value;
   const lines = raw.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim().length);
-
-  const seenIds = new Set();
-  let dupCount = 0;
-  ALL_ITEMS = [];
 
   // primeira linha pode ser cabeçalho: se for, as colunas são lidas pelo nome
   const colMap = lines.length ? detectHeader(lines[0]) : null;
   if(colMap) lines.shift();
 
+  const parsed = [];
   for(const line of lines){
     if(/^product_id/i.test(line)) continue; // cabeçalho repetido no meio da colagem
     const item = parseLine(line, colMap);
-    if(!item) continue;
-    if(seenIds.has(item.id)){
-      dupCount++;
-      continue; // remove duplicado (mesmo Product_id)
-    }
-    seenIds.add(item.id);
-    ALL_ITEMS.push({
-      id: item.id,
-      raw: item,
-      text: buildText(item),
-      desconto: descontoNumerico(item.desc),
-      audience: detectAudience(item.descr, item.categoria),
-    });
+    if(item) parsed.push(item);
   }
-  ALL_DUP_COUNT = dupCount;
+
+  const rawDates = parsed.flatMap(it => [it.inicioRaw, it.fimRaw].filter(Boolean));
+  const fmt = DATE_FORMAT_PREF !== 'auto' ? DATE_FORMAT_PREF : detectDateFormat(rawDates);
+  DATE_FORMAT_USED = rawDates.length ? fmt : null;
+  ALL_ROWS = parsed.map(it => ({
+    ...it,
+    inicio: parseDateStr(it.inicioRaw, fmt),
+    fim: parseDateStr(it.fimRaw, fmt),
+    porNum: parseFloat(parseNumber(it.por)),
+  }));
+
+  setupDayWindow();
+  DAY_FILTER = 'todos';
+  buildItems();
   regroup(false);
+  renderDayCard();
+}
+
+// Linhas válidas num dia (INÍCIO <= dia <= FIM). Sem data = vale sempre.
+function rowsForDay(day){
+  if(day === 'todos') return ALL_ROWS;
+  return ALL_ROWS.filter(r => (!r.inicio || r.inicio <= day) && (!r.fim || r.fim >= day));
+}
+
+// Mesmo Product_id em mais de uma linha (campanhas sobrepostas): fica o
+// menor preço POR. Mantém a posição da primeira aparição.
+// Só junta linhas quando o Product_id E o nome do produto são iguais:
+// se o ID se repete com nomes diferentes, os dois produtos são mantidos.
+function dedupeRows(rows){
+  const best = new Map();
+  let dup = 0;
+  for(const r of rows){
+    const key = r.id + '|' + descrKey(r.descr);
+    const cur = best.get(key);
+    if(!cur){ best.set(key, r); continue; }
+    dup++;
+    const a = isNaN(r.porNum) ? Infinity : r.porNum;
+    const b = isNaN(cur.porNum) ? Infinity : cur.porNum;
+    if(a < b) best.set(key, r);
+  }
+  return {rows: [...best.values()], dup};
+}
+
+function toItem(r){
+  return {
+    id: r.id,
+    raw: r,
+    text: buildText(r),
+    desconto: descontoNumerico(r.desc),
+    audience: detectAudience(r.descr, r.categoria),
+  };
+}
+
+function buildItems(){
+  const {rows, dup} = dedupeRows(rowsForDay(DAY_FILTER));
+  ALL_ITEMS = rows.map(toItem);
+  ALL_DUP_COUNT = dup;
+}
+
+function setDayFilter(day){
+  DAY_FILTER = day;
+  buildItems();
+  regroup(true);
+  renderDayCard();
+}
+
+function setDateFormat(value){
+  DATE_FORMAT_PREF = value;
+  process();
+}
+
+// Período padrão: hoje + 6 dias, ajustado ao intervalo das campanhas.
+function setupDayWindow(){
+  const starts = ALL_ROWS.map(r => r.inicio).filter(Boolean).sort();
+  const ends = ALL_ROWS.map(r => r.fim).filter(Boolean).sort();
+  if(!starts.length && !ends.length){ DAY_FROM = DAY_TO = null; return; }
+  const minStart = starts[0] || null;
+  const maxEnd = ends[ends.length - 1] || null;
+  let from = todayISO();
+  if(minStart && from < minStart) from = minStart;
+  if(maxEnd && from > maxEnd) from = minStart && minStart > addDays(maxEnd, -6) ? minStart : addDays(maxEnd, -6);
+  let to = addDays(from, 6);
+  if(maxEnd && to > maxEnd) to = maxEnd < from ? from : maxEnd;
+  DAY_FROM = from; DAY_TO = to;
+}
+
+function setDayRange(){
+  let from = document.getElementById('dayFrom').value;
+  let to = document.getElementById('dayTo').value;
+  if(!from || !to) return;
+  if(to < from) [from, to] = [to, from];
+  if(addDays(from, 61) < to) to = addDays(from, 61); // no máximo ~2 meses por vez
+  DAY_FROM = from; DAY_TO = to;
+  renderDayCard();
+}
+
+function daysInWindow(){
+  const out = [];
+  if(!DAY_FROM || !DAY_TO) return out;
+  for(let d = DAY_FROM; d <= DAY_TO; d = addDays(d, 1)) out.push(d);
+  return out;
+}
+
+// Monta o texto de um dia no MESMO formato da Saída: categoria, produtos
+// (até 20 por categoria, maior desconto) e "Todos os ids". Respeita os
+// filtros de público e de categoria que estiverem marcados.
+function buildDayBlock(day){
+  const {rows} = dedupeRows(rowsForDay(day));
+  const groups = new Map();
+  for(const r of rows){
+    const it = toItem(r);
+    if(AUDIENCE_FILTER !== 'todos' && it.audience !== AUDIENCE_FILTER) continue;
+    const cat = resolveCategoria(r).categoria;
+    if(ALL_SORTED_CATS.includes(cat) && !SELECTED_CATS.has(cat)) continue;
+    if(!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat).push(it);
+  }
+  const cats = [...groups.keys()].sort((a, b) => {
+    if(a === 'Outros') return 1;
+    if(b === 'Outros') return -1;
+    return a.localeCompare(b, 'pt-BR');
+  });
+  const title = `OFERTAS DE ${weekday(day).toUpperCase()} ${fmtBR(day)}`;
+  const plainLines = [title, ''];
+  const ids = [];
+  for(const cat of cats){
+    const items = groups.get(cat).sort((a, b) => b.desconto - a.desconto).slice(0, OUTPUT_PER_CAT);
+    const catIds = items.map(i => i.id);
+    ids.push(...catIds);
+    plainLines.push(cat.toUpperCase(), ...items.map(i => i.text), `Todos os ids: ${catIds.join(',')}`, '');
+  }
+  while(plainLines.length && plainLines[plainLines.length - 1] === '') plainLines.pop();
+  if(!ids.length) plainLines.push('(nenhum produto em oferta neste dia)');
+  return {plainLines, ids, total: ids.length};
+}
+
+async function copyDay(btn, day){
+  const {plainLines} = buildDayBlock(day);
+  await writeRichClipboard(plainLines.join('\n'), wrapSingleCell(plainLines.map(escapeHtml)), btn);
+}
+
+async function copyDayIds(btn, day){
+  const {ids} = buildDayBlock(day);
+  if(!ids.length) return;
+  await navigator.clipboard.writeText(ids.join(','));
+  const old = btn.textContent; btn.textContent = 'Copiado!';
+  setTimeout(() => btn.textContent = old, 1200);
+}
+
+async function copyAllDays(btn){
+  const days = daysInWindow();
+  if(!days.length) return;
+  const all = [];
+  for(const d of days){ all.push(...buildDayBlock(d).plainLines, '', ''); }
+  while(all.length && all[all.length - 1] === '') all.pop();
+  await writeRichClipboard(all.join('\n'), wrapSingleCell(all.map(escapeHtml)), btn);
+}
+
+function renderDayCard(){
+  const card = document.getElementById('dayCard');
+  const dated = ALL_ROWS.filter(r => r.inicioRaw || r.fimRaw);
+  if(!dated.length){
+    card.style.display = 'none';
+    DAY_FILTER = 'todos';
+    return;
+  }
+  card.style.display = '';
+  document.getElementById('dayFrom').value = DAY_FROM || '';
+  document.getElementById('dayTo').value = DAY_TO || '';
+  document.getElementById('dateFormat').value = DATE_FORMAT_PREF;
+
+  const bad = dated.filter(r => (r.inicioRaw && !r.inicio) || (r.fimRaw && !r.fim)).length;
+  const noDate = ALL_ROWS.length - dated.length;
+  const fmtLabel = DATE_FORMAT_USED === 'dmy' ? 'dia/mês/ano' : 'mês/dia/ano';
+  const exemplo = dated.find(r => r.fim) || dated[0];
+  const exRaw = exemplo.fimRaw || exemplo.inicioRaw;
+  const exIso = exemplo.fim || exemplo.inicio;
+  document.getElementById('dayInfo').textContent =
+    `Datas lidas como ${fmtLabel}` + (exIso ? ` (ex.: ${exRaw} = ${fmtBR(exIso)})` : '')
+    + (noDate ? ` · ${noDate} linha(s) sem data valem todos os dias` : '')
+    + (bad ? ` · ⚠ ${bad} linha(s) com data não reconhecida` : '');
+
+  const list = document.getElementById('dayList');
+  list.innerHTML = '';
+  const today = todayISO();
+  for(const d of daysInWindow()){
+    const n = dedupeRows(rowsForDay(d)).rows.length;
+    const row = document.createElement('div');
+    row.className = 'day-row' + (DAY_FILTER === d ? ' active' : '');
+    const label = document.createElement('span');
+    label.className = 'day-label';
+    label.innerHTML = `<strong>${weekday(d)} ${fmtBR(d)}</strong>${d === today ? ' <span class="n">hoje</span>' : ''}`;
+    const cnt = document.createElement('span');
+    cnt.className = 'day-count';
+    cnt.textContent = `${n} produto(s)`;
+    const ver = document.createElement('button');
+    ver.className = DAY_FILTER === d ? '' : 'secondary';
+    ver.textContent = DAY_FILTER === d ? 'Mostrando' : 'Ver este dia';
+    ver.onclick = () => setDayFilter(d);
+    const cp = document.createElement('button');
+    cp.className = 'secondary'; cp.textContent = 'Copiar dia'; cp.disabled = !n;
+    cp.onclick = () => copyDay(cp, d);
+    const ci = document.createElement('button');
+    ci.className = 'secondary'; ci.textContent = 'Copiar IDs'; ci.disabled = !n;
+    ci.onclick = () => copyDayIds(ci, d);
+    row.append(label, cnt, ver, cp, ci);
+    list.appendChild(row);
+  }
+  const allBtn = document.getElementById('dayAllBtn');
+  allBtn.className = DAY_FILTER === 'todos' ? '' : 'secondary';
+  document.getElementById('dayStatus').textContent = DAY_FILTER === 'todos'
+    ? 'Mostrando todos os produtos, sem filtro de dia.'
+    : `Mostrando só os produtos em oferta em ${weekday(DAY_FILTER)} ${fmtBR(DAY_FILTER)}.`;
 }
 
 // (Re)classifica ALL_ITEMS e monta os grupos. keepSelection=true preserva
@@ -1041,7 +1357,9 @@ function renderOutput(){
 
   if(!ALL_GROUPS){
     resetAllFields(
-      'Nenhum item reconhecido. Verifique se os campos estão separados por TAB.',
+      (ALL_ROWS.length && DAY_FILTER !== 'todos')
+        ? `Nenhum produto em oferta em ${fmtBR(DAY_FILTER)}.`
+        : 'Nenhum item reconhecido. Verifique se os campos estão separados por TAB.',
       'Gere os dados para ver os itens do banner',
       'Gere os dados para ver a separação por faixa de desconto'
     );
@@ -1082,7 +1400,7 @@ function renderOutput(){
     return;
   }
 
-  const OUTPUT_N = 20; // prioriza até 20 produtos por categoria (maior desconto) na Saída
+  const OUTPUT_N = OUTPUT_PER_CAT; // prioriza até 20 produtos por categoria (maior desconto) na Saída
   const ids = [];
   let total = 0;
   for(const cat of sortedCats){
@@ -1169,7 +1487,8 @@ function renderOutput(){
     : '';
   countEl.textContent = `${total} item(ns) em ${sortedCats.length} categoria(s) (até ${OUTPUT_N} por categoria, maior desconto)`
     + (ALL_DUP_COUNT > 0 ? ` · ${ALL_DUP_COUNT} duplicado(s) removido(s) no total` : '')
-    + filterNote;
+    + filterNote
+    + (DAY_FILTER !== 'todos' ? ` · dia: ${fmtBR(DAY_FILTER)}` : '');
   bannerCountEl.textContent = `${bannerTotal} item(ns) — maior desconto de cada categoria (até ${BANNER_N} por categoria, sem separação por categoria)`;
   document.getElementById('bannerIdsOutput').value = bannerIds.join(',');
   window._results = flatResults;
@@ -1510,18 +1829,12 @@ function copyTop125(){
 
 function loadSample(){
   document.getElementById('input').value =
-`Product_id\tCATEGORIA\tDESCR_ITEM\tDE\tPOR\t% DESC
-2101947632\tANTIALERGICOS\tALLEXOFEDRIN 180MG 10 COMP REV\t95,31\t28,9\t-70%
-902522656\tANTIALERGICOS\tDESRINITE 180MG 10CP\t78,57\t23,99\t-69%
-2140825210\tSUPLEMENTOS/NATURAIS\tMELATONINA NEO QUIMICA MARACUJA 90CP\t101,26\t32,99\t-67%
-2093908045\tCREME DENTAL\tCRE DENT ORAL-B STAGES 100G\t16,99\t14,9\t-12%
-2093908227\tCREME DENTAL\tCRE DENT ORAL-B STAGES 100G\t15,99\t14,9\t-7%
-2140001001\tCABELOS\tSHAMPOO ELSEVE CAPSULAS DE OLEO 200ML\t32,9\t19,9\t-40%
-2140001002\tNAO DEFINIDO\tSERUM VITAMINA C LA ROCHE 30ML\t239,9\t149,9\t-38%
-2140001003\tDESODORANTE\tDES AER REXONA WOMEN 150ML\t21,99\t14,99\t-32%
-2140001004\tNAO DEFINIDO\tBATOM MATTE MAYBELLINE VERMELHO\t49,9\t29,9\t-40%
-2140001005\tINFANTIL\tFRALDA PAMPERS CONFORT SEC G 40UN\t89,9\t59,9\t-33%
-2140001006\tNAO DEFINIDO\tKIT PRESENTE NATAL 3 ITENS\t79,9\t49,9\t-37%`;
+`INÍCIO\tFIM\tPRODUCT_ID\tGRUPO\tDESCR ITEM\tDE_sp\tPOR_sp\t% DESC_sp
+10/5/2026\t12/31/2026\t2101947632\tGRIPES E RESFRIADOS\tALLEXOFEDRIN 180MG 10 COMP VER\t96,48\t28,9\t-70,0%
+11/3/2026\t11/30/2026\t2141401155\tGRIPES E RESFRIADOS\tPERFENOL 20CAP\t26,39\t8,9\t-66,3%
+4/14/2026\t3/31/2027\t906630416\tVITAMINAS\tVITAMINA D3 50.000UI 4 CAP MOLE NEOQ\t86,66\t29,99\t-65,4%
+4/14/2026\t3/31/2027\t906630414\tVITAMINAS\tVITAMINA D3 50.000UI 8 CAP MOLE NEOQ\t140,1\t49,99\t-64,3%
+9/9/2026\t2/28/2027\t2140793164\tDOR E FEBRE\tIBUPRIL 400MG 10 CAP GELAT MOLE\t27,82\t9,99\t-64,1%`;
   process();
 }
 
